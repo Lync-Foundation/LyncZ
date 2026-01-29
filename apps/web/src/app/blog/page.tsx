@@ -3,15 +3,20 @@ import { getBlogPosts } from '@/lib/notion';
 import type { BlogLocale } from '@/lib/notion';
 import BlogPageClient from './BlogPageClient';
 
-export const revalidate = 60; // Revalidate every 60 seconds
+// Force dynamic rendering to access cookies
+export const dynamic = 'force-dynamic';
 
 const VALID_BLOG_LOCALES: BlogLocale[] = ['en', 'zh-CN', 'zh-TW'];
 
 async function getLocaleFromCookie(): Promise<BlogLocale> {
-  const cookieStore = await cookies();
-  const nextLocale = cookieStore.get('NEXT_LOCALE')?.value;
-  if (nextLocale && VALID_BLOG_LOCALES.includes(nextLocale as BlogLocale)) {
-    return nextLocale as BlogLocale;
+  try {
+    const cookieStore = await cookies();
+    const nextLocale = cookieStore.get('NEXT_LOCALE')?.value;
+    if (nextLocale && VALID_BLOG_LOCALES.includes(nextLocale as BlogLocale)) {
+      return nextLocale as BlogLocale;
+    }
+  } catch {
+    // Cookie access failed, use default
   }
   return 'en';
 }
