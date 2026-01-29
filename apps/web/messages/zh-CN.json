@@ -10,6 +10,15 @@
     "debug": "调试",
     "connect": "连接"
   },
+  "blog": {
+    "badge": "博客",
+    "title": "新闻与动态",
+    "subtitle": "LyncZ 的最新公告、指南与更新。",
+    "noPosts": "暂无文章",
+    "checkBackSoon": "敬请期待更多内容！",
+    "backToHome": "返回首页",
+    "backToBlog": "返回博客"
+  },
   "account": {
     "title": "我的账户",
     "connectTitle": "连接您的钱包",

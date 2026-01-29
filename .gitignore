@@ -43,6 +43,9 @@ pnpm-debug.log*
 # Local/sensitive data
 **/Local/
 
+# One-off scripts (already executed)
+apps/web/scripts/
+
 # Axiom artifacts
 **/.axiom/
 **/axiom-artifacts/

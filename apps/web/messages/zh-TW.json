@@ -10,6 +10,15 @@
     "debug": "調試",
     "connect": "連接"
   },
+  "blog": {
+    "badge": "部落格",
+    "title": "新聞與動態",
+    "subtitle": "LyncZ 的最新公告、指南與更新。",
+    "noPosts": "暫無文章",
+    "checkBackSoon": "敬請期待更多內容！",
+    "backToHome": "返回首頁",
+    "backToBlog": "返回部落格"
+  },
   "account": {
     "title": "我的帳戶",
     "connectTitle": "連接您的錢包",

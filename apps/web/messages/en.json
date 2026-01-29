@@ -10,6 +10,15 @@
     "debug": "Debug",
     "connect": "Connect"
   },
+  "blog": {
+    "badge": "Blog",
+    "title": "News & Updates",
+    "subtitle": "The latest announcements, guides, and updates from LyncZ.",
+    "noPosts": "No posts yet",
+    "checkBackSoon": "Check back soon for updates!",
+    "backToHome": "Back to Home",
+    "backToBlog": "Back to Blog"
+  },
   "account": {
     "title": "My Account",
     "connectTitle": "Connect Your Wallet",

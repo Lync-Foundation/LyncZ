@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { NextIntlClientProvider } from 'next-intl';
 
 // Static imports for SSG compatibility
@@ -9,6 +10,14 @@ import zhTWMessages from '../../messages/zh-TW.json';
 import zhCNMessages from '../../messages/zh-CN.json';
 
 type Locale = 'en' | 'zh-TW' | 'zh-CN';
+
+const COOKIE_NAME = 'NEXT_LOCALE';
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
+
+function setLocaleCookie(locale: Locale) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${COOKIE_NAME}=${locale}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+}
 
 interface LocaleContextType {
   locale: Locale;
@@ -36,33 +45,33 @@ export function useLocale() {
 }
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
-  // Initialize with 'en' for SSR, will hydrate from localStorage on client
+  const router = useRouter();
+  // Initialize with 'en' for SSR, will hydrate from localStorage/cookie on client
   const [locale, setLocaleState] = useState<Locale>('en');
-  const [mounted, setMounted] = useState(false);
 
-  // Load locale from localStorage on mount (client-side only)
+  // Load locale from localStorage and sync cookie on mount (client-side only)
   useEffect(() => {
-    setMounted(true);
     try {
       const savedLocale = localStorage.getItem('locale') as Locale;
       if (savedLocale && validLocales.includes(savedLocale)) {
         setLocaleState(savedLocale);
+        setLocaleCookie(savedLocale);
       }
     } catch (error) {
-      // localStorage not available (SSR or restricted environment)
       console.warn('localStorage not available:', error);
     }
   }, []);
 
-  const setLocale = (newLocale: Locale) => {
+  const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);
     try {
       localStorage.setItem('locale', newLocale);
+      setLocaleCookie(newLocale);
+      router.refresh(); // Re-run server components (e.g. blog) with new locale
     } catch (error) {
-      // localStorage not available
-      console.warn('Failed to save locale to localStorage:', error);
+      console.warn('Failed to save locale:', error);
     }
-  };
+  }, [router]);
 
   // Get messages for current locale (statically loaded, always available)
   const messages = messagesMap[locale];
