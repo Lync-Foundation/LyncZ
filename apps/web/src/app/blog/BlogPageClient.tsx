@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useTranslations, useLocale } from 'next-intl';
 import { ArrowRight, Calendar, Newspaper } from 'lucide-react';
 import type { BlogPost } from '@/lib/notion';
+import SciFiBackground from '@/components/SciFiBackground';
 
 function formatDate(dateStr: string, locale: string): string {
   const date = new Date(dateStr);
@@ -25,8 +26,9 @@ export default function BlogPageClient({ posts }: { posts: BlogPost[] }) {
   const locale = useLocale();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/20">
-      <div className="container mx-auto px-4 py-12 max-w-4xl">
+    <div className="min-h-screen relative">
+      <SciFiBackground />
+      <div className="container mx-auto px-4 py-12 max-w-4xl relative z-10">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100/50 dark:bg-purple-900/20 rounded-full text-purple-700 dark:text-purple-300 text-sm font-medium mb-4">

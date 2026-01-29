@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useTranslations, useLocale } from 'next-intl';
 import { ArrowLeft, Calendar } from 'lucide-react';
 import type { BlogPostWithContent } from '@/lib/notion';
+import SciFiBackground from '@/components/SciFiBackground';
 
 function formatDate(dateStr: string, locale: string): string {
   const date = new Date(dateStr);
@@ -25,8 +26,9 @@ export default function BlogPostPageClient({ post }: { post: BlogPostWithContent
   const locale = useLocale();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/20">
-      <div className="container mx-auto px-4 py-12 max-w-3xl">
+    <div className="min-h-screen relative">
+      <SciFiBackground />
+      <div className="container mx-auto px-4 py-12 max-w-3xl relative z-10">
         {/* Back Link */}
         <Link
           href="/blog"
