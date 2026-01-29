@@ -39,7 +39,7 @@ export async function getBlogPosts(): Promise<BlogPost[]> {
     });
 
     return response.results.map((page: any) => {
-      const titleProp = Object.values(page.properties).find((p: any) => p.type === 'title');
+      const titleProp = Object.values(page.properties).find((p: any) => p.type === 'title') as { title?: Array<{ plain_text: string }> } | undefined;
       const title = titleProp?.title?.[0]?.plain_text || page.properties.Name?.title?.[0]?.plain_text || 'Untitled';
       return {
         id: page.id,
@@ -84,7 +84,7 @@ export async function getBlogPostBySlug(slug: string): Promise<BlogPostWithConte
     }
 
     const page: any = response.results[0];
-    const titleProp = Object.values(page.properties).find((p: any) => p.type === 'title');
+    const titleProp = Object.values(page.properties).find((p: any) => p.type === 'title') as { title?: Array<{ plain_text: string }> } | undefined;
     const title = titleProp?.title?.[0]?.plain_text || page.properties.Name?.title?.[0]?.plain_text || 'Untitled';
 
     // Get page content (blocks)
