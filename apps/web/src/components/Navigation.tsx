@@ -176,6 +176,18 @@ export function Navigation() {
                 {t('docs')}
               </Button>
             </Link>
+            <Link href="/blog">
+              <Button 
+                variant="ghost"
+                className={`transition-all duration-200 font-medium ${
+                  isActive('/blog') || pathname?.startsWith('/blog/')
+                    ? 'bg-purple-100/50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {t('blog')}
+              </Button>
+            </Link>
             {ENABLE_DEBUG && (
               <Link href="/debug">
                 <Button 
@@ -320,6 +332,18 @@ export function Navigation() {
                     }`}
                   >
                     {t('docs')}
+                  </Button>
+                </Link>
+                <Link href="/blog" onClick={() => setMobileMenuOpen(false)}>
+                  <Button 
+                    variant="ghost"
+                    className={`w-full justify-start transition-all font-medium ${
+                      isActive('/blog') || pathname?.startsWith('/blog/')
+                        ? 'bg-purple-100/50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
+                        : 'text-slate-600 dark:text-slate-300 active:bg-slate-100/50 dark:active:bg-slate-800/50'
+                    }`}
+                  >
+                    {t('blog')}
                   </Button>
                 </Link>
                 {ENABLE_DEBUG && (
