@@ -21,3 +21,4 @@ export default async function BlogPage() {
   const posts = await getBlogPosts(locale);
   return <BlogPageClient posts={posts} />;
 }
+// force rebuild 1769728705
