@@ -1,11 +1,11 @@
 {
-  "name": "zkAlipay - Buy Crypto with Alipay",
-  "short_name": "zkAlipay",
-  "description": "Decentralized fiat gateway powered by zero-knowledge virtual machine",
+  "name": "LyncZ - The Trustless CNY-Crypto P2P Exchange",
+  "short_name": "LyncZ",
+  "description": "The trustless CNY-crypto exchange. Secured by cryptography.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#1677FF",
+  "theme_color": "#9333ea",
   "icons": [
     {
       "src": "/lyncz_logo_transparent.png",
