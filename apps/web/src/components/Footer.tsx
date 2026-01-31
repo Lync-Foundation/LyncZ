@@ -21,8 +21,8 @@ export function Footer() {
               <Image 
                 src="/lyncz_logo_nav.png"
                 alt={logoAlt}
-                width={80}
-                height={80}
+                width={62}
+                height={62}
                 className="rounded-lg"
               />
             </div>
