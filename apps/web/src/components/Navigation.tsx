@@ -83,7 +83,8 @@ export function Navigation() {
     : isSimplifiedChinese
       ? '/logo-compact-zh.svg'
       : '/logo-compact.svg';
-  const logoWidth = isChinese ? 100 : 80;
+  const logoWidth = isChinese ? 150 : 120;
+  const logoHeight = 60;
   const logoAlt = isTraditionalChinese ? '靈犀支付' : isSimplifiedChinese ? '灵犀支付' : 'LyncZ';
 
   const navLogoPath = '/lyncz_logo_nav.png';
@@ -103,8 +104,8 @@ export function Navigation() {
               <Image 
                 src={navLogoPath}
                 alt=""
-                width={96}
-                height={96}
+                width={64}
+                height={64}
                 className="rounded-lg transition-transform group-hover:scale-105"
                 priority
               />
@@ -114,7 +115,7 @@ export function Navigation() {
               src={logoSrc}
               alt={logoAlt}
               width={logoWidth}
-              height={40}
+              height={logoHeight}
               className="saturate-[1.08] contrast-[1.04]"
             />
           </Link>
@@ -226,8 +227,8 @@ export function Navigation() {
               <Image 
                 src={navLogoPath}
                 alt=""
-                width={76}
-                height={76}
+                width={51}
+                height={51}
                 className="rounded-md shrink-0"
                 priority
               />
@@ -235,7 +236,7 @@ export function Navigation() {
                 src={logoSrc}
                 alt={logoAlt}
                 width={logoWidth}
-                height={32}
+                height={48}
                 className="saturate-[1.08] contrast-[1.04]"
               />
             </Link>
