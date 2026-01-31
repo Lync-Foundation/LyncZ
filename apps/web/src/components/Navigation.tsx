@@ -87,7 +87,7 @@ export function Navigation() {
   const logoHeight = 60;
   const logoAlt = isTraditionalChinese ? '靈犀支付' : isSimplifiedChinese ? '灵犀支付' : 'LyncZ';
 
-  const navLogoPath = '/lyncz_logo.svg';
+  const navLogoPath = '/lyncz_logo_nav.png';
 
   return (
     <nav className={`sticky top-0 z-50 transition-all duration-300 ${

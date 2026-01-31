@@ -29,10 +29,10 @@ export const metadata: Metadata = {
   description: "Buy crypto with Alipay or WeChat Pay. Verified by zero-knowledge proofs. No trust required.",
   icons: {
     icon: [
-      { url: '/lyncz_logo.svg?v=2', type: 'image/svg+xml', sizes: '32x32' },
-      { url: '/lyncz_logo.svg?v=2', type: 'image/svg+xml', sizes: '512x512' },
+      { url: '/lyncz_logo_nav.png?v=2', type: 'image/png', sizes: '32x32' },
+      { url: '/lyncz_logo_nav.png?v=2', type: 'image/png', sizes: '512x512' },
     ],
-    apple: { url: '/lyncz_logo.svg?v=2', type: 'image/svg+xml', sizes: '512x512' },
+    apple: { url: '/lyncz_logo_nav.png?v=2', type: 'image/png', sizes: '512x512' },
   },
   openGraph: {
     title: "LyncZ - The Trustless CNY-Crypto P2P Exchange",
