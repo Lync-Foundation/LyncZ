@@ -8,15 +8,15 @@
   "theme_color": "#9333ea",
   "icons": [
     {
-      "src": "/lyncz_logo_transparent.png",
+      "src": "/lyncz_logo.svg?v=2",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "/lyncz_logo_transparent.png",
+      "src": "/lyncz_logo.svg?v=2",
       "sizes": "32x32",
-      "type": "image/png"
+      "type": "image/svg+xml"
     }
   ]
 }
