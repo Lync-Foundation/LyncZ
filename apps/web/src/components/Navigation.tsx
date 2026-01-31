@@ -100,7 +100,7 @@ export function Navigation() {
         <div className="hidden md:flex items-center justify-between">
           {/* Logo: nav icon (no right whitespace) + text logo */}
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity group">
-            <div className="relative shrink-0">
+            <div className="relative shrink-0 -translate-y-1">
               <Image 
                 src={navLogoPath}
                 alt=""
@@ -229,7 +229,7 @@ export function Navigation() {
                 alt=""
                 width={46}
                 height={46}
-                className="rounded-md shrink-0"
+                className="rounded-md shrink-0 -translate-y-0.5"
                 priority
               />
               <Image 
