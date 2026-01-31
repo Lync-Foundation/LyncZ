@@ -948,7 +948,7 @@
     }
   },
   "footer": {
-    "description": "LyncZ: The trustless CNY-crypto exchange. Secured by cryptography.",
+    "description": "<lyncz>LyncZ</lyncz>: The trustless CNY-crypto exchange. Secured by cryptography.",
     "quickLinks": "Quick Links",
     "buy": "Buy Crypto",
     "sell": "Sell Crypto",

@@ -9,19 +9,7 @@ export function Footer() {
   const t = useTranslations('footer');
   const locale = useLocale();
   
-  // Choose logo based on language
-  const isTraditionalChinese = locale === 'zh-TW';
-  const isSimplifiedChinese = locale === 'zh-CN';
-  const isChinese = isTraditionalChinese || isSimplifiedChinese;
-  
-  // Use same logo as Navigation (logo-compact*) for consistent look
-  const logoSrc = isTraditionalChinese 
-    ? '/logo-compact-zh-TW.svg' 
-    : isSimplifiedChinese 
-      ? '/logo-compact-zh.svg' 
-      : '/logo-compact.svg';
-  const logoAlt = isTraditionalChinese ? '靈犀支付' : isSimplifiedChinese ? '灵犀支付' : 'LyncZ';
-  const logoWidth = isChinese ? 160 : 130;
+  const logoAlt = locale === 'zh-TW' ? '靈犀支付' : locale === 'zh-CN' ? '灵犀支付' : 'LyncZ';
 
   return (
     <footer className="relative z-20 bg-slate-50 dark:bg-slate-950">
@@ -31,15 +19,21 @@ export function Footer() {
           <div className="md:col-span-2">
             <div className="flex items-center mb-5 [transform:translateZ(0)]">
               <Image 
-                src={logoSrc}
-                alt={logoAlt} 
-                width={logoWidth}
-                height={40}
-                className="saturate-[1.08] contrast-[1.04]"
+                src="/lyncz_logo_transparent.png"
+                alt={logoAlt}
+                width={80}
+                height={80}
+                className="rounded-lg"
               />
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-md leading-relaxed">
-              {t('description')}
+              {t.rich('description', {
+                lyncz: (chunks) => (
+                  <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 bg-clip-text text-transparent font-semibold">
+                    {chunks}
+                  </span>
+                ),
+              })}
             </p>
             
             {/* Social Links - lighter style */}
