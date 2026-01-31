@@ -86,7 +86,7 @@ export function Navigation() {
     : isSimplifiedChinese 
       ? '/logo-compact-zh.svg' 
       : '/logo-compact.svg';
-  const logoWidth = isChinese ? 170 : 150;
+  const logoWidth = isChinese ? 340 : 300;
   const logoAlt = isTraditionalChinese ? '靈犀支付' : isSimplifiedChinese ? '灵犀支付' : 'LyncZ';
 
   return (
@@ -99,13 +99,13 @@ export function Navigation() {
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center justify-between">
           {/* Logo with icon */}
-          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity group">
+          <Link href="/" className="flex items-center gap-4 hover:opacity-80 transition-opacity group">
             <div className="relative">
               <Image 
                 src="/lyncz_logo_transparent.png"
                 alt="LyncZ Icon" 
-                width={48}
-                height={48}
+                width={96}
+                height={96}
                 className="rounded-lg transition-transform group-hover:scale-105"
                 priority
               />
@@ -116,7 +116,7 @@ export function Navigation() {
               src={logoSrc}
               alt={logoAlt} 
               width={logoWidth}
-              height={48}
+              height={96}
               priority
             />
           </Link>
@@ -224,12 +224,12 @@ export function Navigation() {
         <div className="md:hidden">
           <div className="flex items-center justify-between">
             {/* Logo with icon */}
-            <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <Image 
                 src="/lyncz_logo_transparent.png"
                 alt="LyncZ Icon" 
-                width={38}
-                height={38}
+                width={76}
+                height={76}
                 className="rounded-md"
                 priority
               />
@@ -237,7 +237,7 @@ export function Navigation() {
                 src={logoSrc}
                 alt={logoAlt} 
                 width={Math.round(logoWidth * 0.72)}
-                height={38}
+                height={76}
                 priority
               />
             </Link>
