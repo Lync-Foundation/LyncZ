@@ -104,8 +104,8 @@ export function Navigation() {
               <Image 
                 src={navLogoPath}
                 alt=""
-                width={64}
-                height={64}
+                width={58}
+                height={58}
                 className="rounded-lg transition-transform group-hover:scale-105"
                 priority
               />
@@ -227,8 +227,8 @@ export function Navigation() {
               <Image 
                 src={navLogoPath}
                 alt=""
-                width={51}
-                height={51}
+                width={46}
+                height={46}
                 className="rounded-md shrink-0"
                 priority
               />
