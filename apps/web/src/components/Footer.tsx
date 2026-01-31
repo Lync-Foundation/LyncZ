@@ -19,7 +19,7 @@ export function Footer() {
           <div className="md:col-span-2">
             <div className="flex items-center mb-5 [transform:translateZ(0)]">
               <Image 
-                src="/lyncz_logo_transparent.png"
+                src="/lyncz_logo_nav.png"
                 alt={logoAlt}
                 width={80}
                 height={80}
