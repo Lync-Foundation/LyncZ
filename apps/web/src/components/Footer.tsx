@@ -24,7 +24,7 @@ export function Footer() {
   const logoWidth = isChinese ? 160 : 130;
 
   return (
-    <footer className="relative z-20 bg-slate-50/80 dark:bg-slate-950/50 backdrop-blur-sm">
+    <footer className="relative z-20 bg-slate-50 dark:bg-slate-950">
       <div className="container mx-auto px-4 py-14">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
           {/* Logo & Description */}
