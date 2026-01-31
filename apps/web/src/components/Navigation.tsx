@@ -9,7 +9,7 @@ import { LanguageSelector } from '@/components/LanguageSelector';
 import { WalletButton } from '@/components/WalletButton';
 import { useAccount } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { Menu, X, Wallet } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useBuyerTrades } from '@/hooks/useBuyerTrades';
@@ -43,7 +43,6 @@ function MobileWalletPill() {
 
 export function Navigation() {
   const pathname = usePathname();
-  const locale = useLocale();
   const t = useTranslations('nav');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -75,20 +74,6 @@ export function Navigation() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
-  // Choose logo based on language
-  const isTraditionalChinese = locale === 'zh-TW';
-  const isSimplifiedChinese = locale === 'zh-CN';
-  const isChinese = isTraditionalChinese || isSimplifiedChinese;
-  
-  // Use correct Traditional/Simplified Chinese logo
-  const logoSrc = isTraditionalChinese 
-    ? '/logo-compact-zh-TW.svg' 
-    : isSimplifiedChinese 
-      ? '/logo-compact-zh.svg' 
-      : '/logo-compact.svg';
-  const logoWidth = isChinese ? 140 : 120;
-  const logoAlt = isTraditionalChinese ? '靈犀支付' : isSimplifiedChinese ? '灵犀支付' : 'LyncZ';
-
   return (
     <nav className={`sticky top-0 z-50 transition-all duration-300 ${
       scrolled 
@@ -99,26 +84,19 @@ export function Navigation() {
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center justify-between">
           {/* Logo with icon */}
-          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity group">
+          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity group">
             <div className="relative">
               <Image 
                 src="/lyncz_logo_transparent.png"
-                alt="LyncZ Icon" 
-                width={96}
-                height={96}
+                alt="LyncZ" 
+                width={192}
+                height={192}
                 className="rounded-lg transition-transform group-hover:scale-105"
                 priority
               />
               {/* Subtle glow effect on hover */}
               <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-hover:opacity-100 blur-sm transition-opacity" />
             </div>
-            <Image 
-              src={logoSrc}
-              alt={logoAlt} 
-              width={logoWidth}
-              height={40}
-              priority
-            />
           </Link>
 
           {/* Navigation Links */}
@@ -224,20 +202,13 @@ export function Navigation() {
         <div className="md:hidden">
           <div className="flex items-center justify-between">
             {/* Logo with icon */}
-            <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
               <Image 
                 src="/lyncz_logo_transparent.png"
-                alt="LyncZ Icon" 
-                width={76}
-                height={76}
+                alt="LyncZ" 
+                width={152}
+                height={152}
                 className="rounded-md"
-                priority
-              />
-              <Image 
-                src={logoSrc}
-                alt={logoAlt} 
-                width={Math.round(logoWidth * 0.7)}
-                height={28}
                 priority
               />
             </Link>

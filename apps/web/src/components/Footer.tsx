@@ -29,14 +29,7 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
           {/* Logo & Description */}
           <div className="md:col-span-2">
-            <div className="flex items-center gap-3 mb-5 [transform:translateZ(0)]">
-              <Image 
-                src="/lyncz_logo_transparent.png"
-                alt="LyncZ Icon" 
-                width={40}
-                height={40}
-                className="rounded-lg saturate-[1.08] contrast-[1.04]"
-              />
+            <div className="flex items-center mb-5 [transform:translateZ(0)]">
               <Image 
                 src={logoSrc}
                 alt={logoAlt} 

@@ -721,7 +721,7 @@ export default function HomePage() {
             >
               <h2 className="text-4xl md:text-5xl font-bold mb-4">
                 <span className="text-slate-800 dark:text-white">{t('whyTrade.title')} </span>
-                <span className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">{t('whyTrade.titleHighlight')}</span>
+                <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">{t('whyTrade.titleHighlight')}</span>
               </h2>
               <motion.p 
                 className="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto"
