@@ -1,14 +1,11 @@
 <svg width="80" height="40" viewBox="0 0 80 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- LyncZ compact logo (no spacing) -->
+  <!-- LyncZ compact logo – same gradient as hero: blue-600 → purple-600 → pink-500 -->
   <defs>
     <linearGradient id="compactGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#9333ea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
     </linearGradient>
   </defs>
-  
-  <!-- Combined "LyncZ" text using tspan for different colors -->
-  <text x="0" y="28" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="24" font-weight="700">
-    <tspan fill="url(#compactGradient)">Lync</tspan><tspan fill="#EC4899" font-weight="800">Z</tspan>
-  </text>
+  <text x="0" y="28" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="24" font-weight="700" fill="url(#compactGradient)">LyncZ</text>
 </svg>
