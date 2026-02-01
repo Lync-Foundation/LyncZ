@@ -116,12 +116,12 @@ export function ReceiptTutorialModal({
             <div className="bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-300/50 dark:border-emerald-500/30 rounded-xl p-3 text-center">
               <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400 mx-auto mb-1" />
               <p className="font-bold text-emerald-800 dark:text-emerald-200 text-xs">{t('step3.correct')}</p>
-              <p className="text-emerald-700 dark:text-emerald-300 font-mono text-xs mt-1">申请电子回单</p>
+              <p className="text-emerald-700 dark:text-emerald-300 font-mono text-xs mt-1">{isEnglish ? 'Apply for e-receipt' : '申请电子回单'}</p>
             </div>
             <div className="bg-red-50/80 dark:bg-red-950/30 border border-red-300/50 dark:border-red-500/30 rounded-xl p-3 text-center">
               <X className="h-6 w-6 text-red-600 dark:text-red-400 mx-auto mb-1" />
               <p className="font-bold text-red-800 dark:text-red-200 text-xs">{t('step3.wrong')}</p>
-              <p className="text-red-700 dark:text-red-300 font-mono text-xs mt-1">转账凭证</p>
+              <p className="text-red-700 dark:text-red-300 font-mono text-xs mt-1">{isEnglish ? 'Proof of Account Transactions' : '转账凭证'}</p>
             </div>
           </div>
         </div>
@@ -135,7 +135,7 @@ export function ReceiptTutorialModal({
         <div className="bg-gradient-to-br from-blue-50/80 to-purple-50/80 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200/30 dark:border-blue-500/20 rounded-2xl p-5">
           <p className="text-sm text-slate-700 dark:text-slate-200 mb-3">{t('step4.instruction')}</p>
           <div className="bg-blue-600 text-white font-bold py-2 px-6 rounded-xl text-center shadow-lg text-sm">
-            申请
+            {isEnglish ? 'Submit' : '申请'}
           </div>
         </div>
       )

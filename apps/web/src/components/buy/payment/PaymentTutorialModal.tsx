@@ -6,7 +6,9 @@ import {
   CheckCircle2, 
   ChevronRight,
   ChevronLeft,
-  X
+  X,
+  Copy,
+  Check
 } from 'lucide-react';
 import { useTranslations, useLocale } from 'next-intl';
 import Image from 'next/image';
@@ -27,9 +29,20 @@ export function PaymentTutorialModal({
   amount 
 }: PaymentTutorialModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [copiedId, setCopiedId] = useState(false);
   const t = useTranslations('buy.paymentInstructions.paymentTutorial');
   const locale = useLocale();
   const isEnglish = locale === 'en';
+
+  const copyAlipayId = async () => {
+    try {
+      await navigator.clipboard.writeText(alipayId);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   // Use English images when locale is English
   const paymentImages = isEnglish
@@ -46,7 +59,25 @@ export function PaymentTutorialModal({
           <p className="text-sm text-slate-700 dark:text-slate-200 mb-3">{t('step1.instruction')}</p>
           <div className="bg-white/60 dark:bg-slate-800/40 backdrop-blur-sm rounded-xl p-3 border border-slate-200/30 dark:border-slate-700/20">
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('step1.searchFor')}</p>
-            <p className="font-mono font-bold text-slate-800 dark:text-white break-all">{alipayId}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono font-bold text-slate-800 dark:text-white break-all">{alipayId}</p>
+              <button
+                onClick={copyAlipayId}
+                className="flex-shrink-0 flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-100/50 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
+              >
+                {copiedId ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                    <span className="text-emerald-600 dark:text-emerald-400">{t('copied') || 'Copied!'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    <span>{t('copy') || 'Copy'}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )
@@ -62,7 +93,7 @@ export function PaymentTutorialModal({
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t('step2.findSeller')}</p>
             <p className="font-bold text-slate-800 dark:text-white mb-3">{alipayName}</p>
             <div className="bg-blue-500 text-white font-bold py-1.5 px-4 rounded-lg text-center text-sm inline-block">
-              转账
+              {isEnglish ? 'Transaction' : '转账'}
             </div>
           </div>
         </div>

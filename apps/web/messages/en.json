@@ -435,6 +435,8 @@
         "previous": "Previous",
         "next": "Next",
         "gotIt": "Got it!",
+        "copy": "Copy",
+        "copied": "Copied!",
         "step1": {
           "title": "Search Account",
           "description": "Open Alipay and search for seller",
@@ -442,9 +444,9 @@
           "searchFor": "Search for:"
         },
         "step2": {
-          "title": "Click Transfer",
-          "description": "Find seller and click transfer button",
-          "instruction": "Find the seller under \"可能想找的人\" and click \"转账\"",
+          "title": "Click Transaction",
+          "description": "Find seller and click Transaction button",
+          "instruction": "Find the seller under \"People You May Looking For\" and click \"Transaction\"",
           "findSeller": "Find this seller:"
         },
         "step3": {
@@ -461,9 +463,9 @@
         "next": "Next",
         "gotIt": "Got it!",
         "step1": {
-          "title": "Open Bills",
-          "description": "Open Alipay → My → Bills",
-          "instruction": "Tap \"Bills\" (账单) in the menu"
+          "title": "Open My Transactions",
+          "description": "Open Alipay → Me → My Transactions",
+          "instruction": "Tap \"My Transactions\" in the menu"
         },
         "step2": {
           "title": "Find Transaction",
@@ -472,15 +474,15 @@
         },
         "step3": {
           "title": "Request Receipt",
-          "description": "Tap \"申请电子回单\"",
-          "warningText": "Click \"申请电子回单\", NOT \"转账凭证\"",
+          "description": "Tap \"Apply for e-receipt\"",
+          "warningText": "Click \"Apply for e-receipt\", NOT \"Proof of Account Transactions\"",
           "correct": "Click This",
           "wrong": "NOT This"
         },
         "step4": {
-          "title": "Apply",
-          "description": "Tap the Apply button",
-          "instruction": "Tap the blue \"申请\" button"
+          "title": "Submit",
+          "description": "Tap the Submit button",
+          "instruction": "Tap the blue \"Submit\" button"
         },
         "step5": {
           "title": "Enter Email",
@@ -489,8 +491,8 @@
         },
         "step6": {
           "title": "Confirm Name",
-          "description": "Verify seller's name",
-          "instruction": "Enter seller's last name and tap \"确定\"",
+          "description": "Verify recipient's name",
+          "instruction": "Enter recipient's full name and tap \"Confirm\"",
           "enterName": "Enter this:"
         },
         "copy": "Copy",

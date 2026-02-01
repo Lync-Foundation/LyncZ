@@ -435,6 +435,8 @@
         "previous": "上一步",
         "next": "下一步",
         "gotIt": "明白了！",
+        "copy": "複製",
+        "copied": "已複製！",
         "step1": {
           "title": "搜尋帳號",
           "description": "打開支付寶搜尋賣家",
