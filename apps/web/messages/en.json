@@ -475,9 +475,7 @@
         "step3": {
           "title": "Request Receipt",
           "description": "Tap \"Apply for e-receipt\"",
-          "warningText": "Click \"Apply for e-receipt\", NOT \"Proof of Account Transactions\"",
-          "correct": "Click This",
-          "wrong": "NOT This"
+          "instruction": "Tap \"Apply for e-receipt\" at the bottom of the page"
         },
         "step4": {
           "title": "Submit",
