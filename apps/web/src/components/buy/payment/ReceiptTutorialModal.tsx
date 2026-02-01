@@ -9,7 +9,8 @@ import {
   X,
   AlertTriangle
 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
+import { Copy, Check } from 'lucide-react';
 import Image from 'next/image';
 
 interface ReceiptTutorialModalProps {
@@ -37,14 +38,48 @@ export function ReceiptTutorialModal({
   sellerName 
 }: ReceiptTutorialModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [copied, setCopied] = useState(false);
   const t = useTranslations('buy.paymentInstructions.receiptTutorial');
+  const locale = useLocale();
+  const isEnglish = locale === 'en';
   const lastName = getLastName(sellerName);
+
+  // Use English images when locale is English
+  const receiptImages = isEnglish
+    ? [
+        '/tutorial/receipt eng 1.jpg',
+        '/tutorial/receipt eng 2.jpg',
+        '/tutorial/receipt eng 3.jpg',
+        '/tutorial/receipt eng 4.jpg',
+        '/tutorial/receipt eng 5.jpg',
+        '/tutorial/receipt eng 6.jpg',
+        '/tutorial/receipt eng 7.jpg',
+      ]
+    : [
+        '/tutorial/receipt 1.jpg',
+        '/tutorial/receipt 2.jpg',
+        '/tutorial/receipt 3.jpg',
+        '/tutorial/receipt 4.jpg',
+        '/tutorial/receipt 5.jpg',
+        '/tutorial/receipt 6.jpg',
+        '/tutorial/receipt 7.jpg',
+      ];
+
+  const copyLastName = async () => {
+    try {
+      await navigator.clipboard.writeText(lastName);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   const steps = [
     {
       title: t('step1.title'),
       description: t('step1.description'),
-      image: '/tutorial/receipt 1.jpg',
+      image: receiptImages[0],
       content: (
         <div className="bg-gradient-to-br from-blue-50/80 to-purple-50/80 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200/30 dark:border-blue-500/20 rounded-2xl p-5">
           <p className="text-sm text-slate-700 dark:text-slate-200">{t('step1.instruction')}</p>
@@ -54,7 +89,7 @@ export function ReceiptTutorialModal({
     {
       title: t('step2.title'),
       description: t('step2.description', { name: sellerName }),
-      image: '/tutorial/receipt 2.jpg',
+      image: receiptImages[1],
       content: (
         <div className="bg-gradient-to-br from-purple-50/80 to-pink-50/80 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-200/30 dark:border-purple-500/20 rounded-2xl p-5">
           <p className="text-sm text-slate-500 dark:text-slate-400">{t('step2.lookFor')}</p>
@@ -65,7 +100,7 @@ export function ReceiptTutorialModal({
     {
       title: t('step3.title'),
       description: t('step3.description'),
-      image: '/tutorial/receipt 3.jpg',
+      image: receiptImages[2],
       content: (
         <div className="space-y-4">
           {/* Critical warning */}
@@ -95,7 +130,7 @@ export function ReceiptTutorialModal({
     {
       title: t('step4.title'),
       description: t('step4.description'),
-      image: '/tutorial/receipt 4.jpg',
+      image: receiptImages[3],
       content: (
         <div className="bg-gradient-to-br from-blue-50/80 to-purple-50/80 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200/30 dark:border-blue-500/20 rounded-2xl p-5">
           <p className="text-sm text-slate-700 dark:text-slate-200 mb-3">{t('step4.instruction')}</p>
@@ -108,7 +143,7 @@ export function ReceiptTutorialModal({
     {
       title: t('step5.title'),
       description: t('step5.description'),
-      image: '/tutorial/receipt 5.jpg',
+      image: receiptImages[4],
       content: (
         <div className="bg-gradient-to-br from-purple-50/80 to-pink-50/80 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-200/30 dark:border-purple-500/20 rounded-2xl p-5">
           <p className="text-sm text-slate-700 dark:text-slate-200">{t('step5.instruction')}</p>
@@ -118,13 +153,31 @@ export function ReceiptTutorialModal({
     {
       title: t('step6.title'),
       description: t('step6.description'),
-      image: '/tutorial/receipt 6.jpg',
+      image: receiptImages[5],
       content: (
         <div className="bg-gradient-to-br from-amber-50/80 to-orange-50/80 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200/30 dark:border-amber-500/20 rounded-2xl p-5">
           <p className="text-sm text-slate-700 dark:text-slate-200 mb-3">{t('step6.instruction')}</p>
           <div className="bg-white/60 dark:bg-slate-800/40 backdrop-blur-sm rounded-xl p-3 border border-slate-200/30 dark:border-slate-700/20">
             <p className="text-xs text-slate-500 dark:text-slate-400">{t('step6.enterName')}</p>
-            <p className="text-xl font-bold text-slate-800 dark:text-white">{lastName}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xl font-bold text-slate-800 dark:text-white">{lastName}</p>
+              <button
+                onClick={copyLastName}
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-100/50 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                    <span className="text-emerald-600 dark:text-emerald-400">{t('copied') || 'Copied!'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    <span>{t('copy') || 'Copy'}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )
@@ -132,7 +185,7 @@ export function ReceiptTutorialModal({
     {
       title: t('step7.title'),
       description: t('step7.description'),
-      image: '/tutorial/receipt 7.jpg',
+      image: receiptImages[6],
       content: (
         <div className="bg-gradient-to-br from-emerald-50/80 to-green-50/80 dark:from-emerald-950/30 dark:to-green-950/30 border border-emerald-200/30 dark:border-emerald-500/20 rounded-2xl p-5">
           <div className="flex items-center gap-3 mb-3">

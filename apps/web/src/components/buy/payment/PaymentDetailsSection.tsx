@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, HelpCircle } from 'lucide-react';
+import { ExternalLink, HelpCircle, Copy, Check } from 'lucide-react';
 import { getTransactionUrl } from '@/lib/contracts';
 import type { Trade, TradeStatus } from './types';
 import { useTranslations } from 'next-intl';
@@ -20,6 +21,23 @@ export function PaymentDetailsSection({
   onOpenTutorial 
 }: PaymentDetailsSectionProps) {
   const t = useTranslations('buy.paymentInstructions');
+  const [copiedId, setCopiedId] = useState(false);
+  const [copiedName, setCopiedName] = useState(false);
+
+  const copyToClipboard = async (text: string, type: 'id' | 'name') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (type === 'id') {
+        setCopiedId(true);
+        setTimeout(() => setCopiedId(false), 2000);
+      } else {
+        setCopiedName(true);
+        setTimeout(() => setCopiedName(false), 2000);
+      }
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
   
   return (
     <>
@@ -48,8 +66,24 @@ export function PaymentDetailsSection({
             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               {t('alipayAccountId')}
             </label>
-            <div className="font-mono text-sm md:text-xl font-bold text-slate-800 dark:text-white bg-white/5 dark:bg-slate-800/10 backdrop-blur-sm px-4 py-3 rounded-xl border border-slate-200/15 dark:border-slate-700/10 break-all">
-              {trade.alipay_id}
+            <div className="flex items-center justify-between gap-2 font-mono text-sm md:text-xl font-bold text-slate-800 dark:text-white bg-white/5 dark:bg-slate-800/10 backdrop-blur-sm px-4 py-3 rounded-xl border border-slate-200/15 dark:border-slate-700/10">
+              <span className="break-all">{trade.alipay_id}</span>
+              <button
+                onClick={() => copyToClipboard(trade.alipay_id, 'id')}
+                className="flex-shrink-0 flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-100/50 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
+              >
+                {copiedId ? (
+                  <>
+                    <Check className="h-4 w-4 text-emerald-500" />
+                    <span className="text-emerald-600 dark:text-emerald-400 hidden sm:inline">{t('copied') || 'Copied!'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span className="hidden sm:inline">{t('copy') || 'Copy'}</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
@@ -58,8 +92,24 @@ export function PaymentDetailsSection({
             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
               {t('alipayAccountName')}
             </label>
-            <div className="text-xl font-bold text-slate-800 dark:text-white bg-white/5 dark:bg-slate-800/10 backdrop-blur-sm px-4 py-3 rounded-xl border border-slate-200/15 dark:border-slate-700/10">
-              {trade.alipay_name}
+            <div className="flex items-center justify-between gap-2 text-xl font-bold text-slate-800 dark:text-white bg-white/5 dark:bg-slate-800/10 backdrop-blur-sm px-4 py-3 rounded-xl border border-slate-200/15 dark:border-slate-700/10">
+              <span>{trade.alipay_name}</span>
+              <button
+                onClick={() => copyToClipboard(trade.alipay_name, 'name')}
+                className="flex-shrink-0 flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-100/50 dark:hover:bg-purple-900/30 rounded-lg transition-colors"
+              >
+                {copiedName ? (
+                  <>
+                    <Check className="h-4 w-4 text-emerald-500" />
+                    <span className="text-emerald-600 dark:text-emerald-400 hidden sm:inline">{t('copied') || 'Copied!'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span className="hidden sm:inline">{t('copy') || 'Copy'}</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 

@@ -8,7 +8,7 @@ import {
   ChevronLeft,
   X
 } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import Image from 'next/image';
 
 interface PaymentTutorialModalProps {
@@ -28,12 +28,19 @@ export function PaymentTutorialModal({
 }: PaymentTutorialModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const t = useTranslations('buy.paymentInstructions.paymentTutorial');
+  const locale = useLocale();
+  const isEnglish = locale === 'en';
+
+  // Use English images when locale is English
+  const paymentImages = isEnglish
+    ? ['/tutorial/payment eng 1.jpg', '/tutorial/payment eng 2.jpg', '/tutorial/payment eng 3.jpg']
+    : ['/tutorial/payment1.jpg', '/tutorial/payment 2.jpg', '/tutorial/payment.3jpg.jpg'];
 
   const steps = [
     {
       title: t('step1.title'),
       description: t('step1.description'),
-      image: '/tutorial/payment1.jpg',
+      image: paymentImages[0],
       content: (
         <div className="bg-gradient-to-br from-blue-50/80 to-purple-50/80 dark:from-blue-950/30 dark:to-purple-950/30 border border-blue-200/30 dark:border-blue-500/20 rounded-2xl p-5">
           <p className="text-sm text-slate-700 dark:text-slate-200 mb-3">{t('step1.instruction')}</p>
@@ -47,7 +54,7 @@ export function PaymentTutorialModal({
     {
       title: t('step2.title'),
       description: t('step2.description'),
-      image: '/tutorial/payment 2.jpg',
+      image: paymentImages[1],
       content: (
         <div className="bg-gradient-to-br from-purple-50/80 to-pink-50/80 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-200/30 dark:border-purple-500/20 rounded-2xl p-5">
           <p className="text-sm text-slate-700 dark:text-slate-200 mb-3">{t('step2.instruction')}</p>
@@ -64,7 +71,7 @@ export function PaymentTutorialModal({
     {
       title: t('step3.title'),
       description: t('step3.description'),
-      image: '/tutorial/payment.3jpg.jpg',
+      image: paymentImages[2],
       content: (
         <div className="space-y-4">
           <div className="bg-gradient-to-br from-emerald-50/80 to-green-50/80 dark:from-emerald-950/30 dark:to-green-950/30 border border-emerald-200/30 dark:border-emerald-500/20 rounded-2xl p-5">

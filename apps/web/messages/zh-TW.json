@@ -333,6 +333,8 @@
       "alipayAccountId": "支付寶帳號",
       "alipayAccountName": "支付寶姓名",
       "amountToTransfer": "轉帳金額",
+      "copy": "複製",
+      "copied": "已複製！",
       "paymentNoteCritical": "付款備註（重要）",
       "mustInclude": "您必須在付款備註欄位中包含此確切數字！",
       "viewTrade": "查看交易",
@@ -496,7 +498,9 @@
           "description": "電子回單將發送到郵箱",
           "success": "成功！",
           "instruction": "查收郵件，下載PDF，然後在此上傳"
-        }
+        },
+        "copy": "複製",
+        "copied": "已複製！"
       }
     },
     "processingSection": {

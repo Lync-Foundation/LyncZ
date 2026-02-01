@@ -333,6 +333,8 @@
       "alipayAccountId": "Alipay Account ID",
       "alipayAccountName": "Alipay Account Name",
       "amountToTransfer": "Amount to Transfer",
+      "copy": "Copy",
+      "copied": "Copied!",
       "paymentNoteCritical": "Payment Note (CRITICAL)",
       "mustInclude": "You MUST include this exact number in the payment note field!",
       "viewTrade": "View Trade",
@@ -491,6 +493,8 @@
           "instruction": "Enter seller's last name and tap \"确定\"",
           "enterName": "Enter this:"
         },
+        "copy": "Copy",
+        "copied": "Copied!",
         "step7": {
           "title": "Done",
           "description": "Receipt will be sent to your email",
