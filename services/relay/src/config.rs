@@ -6,6 +6,15 @@
 
 use std::env;
 
+/// Per-chain configuration for a single blockchain
+#[derive(Debug, Clone)]
+pub struct ChainConfig {
+    pub chain_id: u64,
+    pub rpc_url: String,
+    pub escrow_address: String,
+    pub name: String,          // "Base" or "Ethereum"
+}
+
 /// Main configuration struct - only essential runtime values
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -16,12 +25,15 @@ pub struct Config {
     pub api_host: String,
     pub api_port: u16,
     
-    // Blockchain
+    // Primary chain (Base Mainnet by default)
     pub chain_id: u64,
     pub rpc_url: String,
     pub escrow_address: String,
     
-    // Relayer (for signing transactions)
+    // All supported chains (populated from env vars)
+    pub chains: Vec<ChainConfig>,
+    
+    // Relayer (for signing transactions - same wallet for all chains)
     pub relayer_private_key: Option<String>,
     
     // Axiom API (for ZK proof generation)
@@ -69,6 +81,49 @@ impl Config {
         // Resend API key (for email notifications)
         let resend_api_key = env::var("RESEND_API_KEY").ok();
         
+        // Build chain configs
+        let mut chains = vec![
+            ChainConfig {
+                chain_id,
+                rpc_url: rpc_url.clone(),
+                escrow_address: escrow_address.clone(),
+                name: if chain_id == 1 { "Ethereum".to_string() } else { "Base".to_string() },
+            },
+        ];
+        
+        // Optional: Ethereum Mainnet config (ETH_RPC_URL + ETH_ESCROW_ADDRESS)
+        if let (Ok(eth_rpc), Ok(eth_escrow)) = (env::var("ETH_RPC_URL"), env::var("ETH_ESCROW_ADDRESS")) {
+            let eth_chain_id: u64 = env::var("ETH_CHAIN_ID")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(1); // Ethereum mainnet default
+            
+            chains.push(ChainConfig {
+                chain_id: eth_chain_id,
+                rpc_url: eth_rpc,
+                escrow_address: eth_escrow,
+                name: "Ethereum".to_string(),
+            });
+        }
+        
+        // Optional: Base config when primary is ETH (BASE_RPC_URL + BASE_ESCROW_ADDRESS)
+        if let (Ok(base_rpc), Ok(base_escrow)) = (env::var("BASE_RPC_URL"), env::var("BASE_ESCROW_ADDRESS")) {
+            let base_chain_id: u64 = env::var("BASE_CHAIN_ID")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(8453);
+            
+            // Only add if not already the primary chain
+            if !chains.iter().any(|c| c.chain_id == base_chain_id) {
+                chains.push(ChainConfig {
+                    chain_id: base_chain_id,
+                    rpc_url: base_rpc,
+                    escrow_address: base_escrow,
+                    name: "Base".to_string(),
+                });
+            }
+        }
+        
         Ok(Config {
             database_url,
             api_host,
@@ -76,6 +131,7 @@ impl Config {
             chain_id,
             rpc_url,
             escrow_address,
+            chains,
             relayer_private_key,
             axiom_api_key,
             resend_api_key,
@@ -85,9 +141,12 @@ impl Config {
     /// Log current configuration (hiding secrets)
     pub fn log_summary(&self) {
         tracing::info!("=== LyncZ Configuration ===");
-        tracing::info!("Network: Chain ID {}", self.chain_id);
-        tracing::info!("RPC: {}...", &self.rpc_url[..50.min(self.rpc_url.len())]);
-        tracing::info!("Escrow: {}", self.escrow_address);
+        tracing::info!("Supported chains: {}", self.chains.len());
+        for chain in &self.chains {
+            tracing::info!("  {} (chain_id={}): escrow={}, rpc={}...", 
+                chain.name, chain.chain_id, chain.escrow_address,
+                &chain.rpc_url[..50.min(chain.rpc_url.len())]);
+        }
         tracing::info!("Relayer: {}", if self.relayer_private_key.is_some() { "✅ Set" } else { "❌ Not set" });
         tracing::info!("Axiom API: {}", if self.axiom_api_key.is_some() { "✅ Set" } else { "❌ Not set" });
         tracing::info!("Resend API: {}", if self.resend_api_key.is_some() { "✅ Set" } else { "❌ Not set" });

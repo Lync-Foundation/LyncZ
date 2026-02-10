@@ -226,8 +226,9 @@ pub async fn validate_handler(
     // Step 6: Fetch account_lines_hash directly from blockchain
     // This avoids masking edge cases by using the hash that was computed by the frontend
     // and stored on-chain during order creation
-    let blockchain_client = state.blockchain_client.as_ref()
-        .ok_or_else(|| ApiError::Internal("Blockchain client not configured".to_string()))?;
+    let trade_chain_id = trade.chain_id as u64;
+    let blockchain_client = state.get_blockchain_client(trade_chain_id)
+        .ok_or_else(|| ApiError::Internal(format!("Blockchain client not available for chain {}", trade_chain_id)))?;
     
     let onchain_account_hash = blockchain_client.get_order_hash(&trade.order_id).await
         .map_err(|e| ApiError::Internal(format!("Failed to fetch order hash from blockchain: {}", e)))?;
@@ -272,10 +273,9 @@ pub async fn validate_handler(
     
     // Step 11: If valid, check key rotation and spawn background settlement
     if valid {
-        // Get blockchain client for key management
-        let blockchain_client = state.blockchain_client
-            .as_ref()
-            .ok_or_else(|| ApiError::ServiceUnavailable("Blockchain not enabled".to_string()))?;
+        // Get blockchain client for key management (use trade's chain)
+        let blockchain_client = state.get_blockchain_client(trade_chain_id)
+            .ok_or_else(|| ApiError::ServiceUnavailable(format!("Blockchain not enabled for chain {}", trade_chain_id)))?;
         
         // OPTIMISTIC KEY ROTATION - Compare PDF's public key hash with on-chain hash
         // Done AFTER validation to not delay the user's response
@@ -430,9 +430,13 @@ async fn run_background_settlement_inner(
     transaction_id: &str,
     payment_time: &str,
 ) -> Result<(), String> {
-    let blockchain_client = state.blockchain_client
-        .as_ref()
-        .ok_or_else(|| "Blockchain not enabled".to_string())?;
+    // Look up the trade to get its chain_id
+    let trade = state.db.get_trade(trade_id).await
+        .map_err(|e| format!("Failed to get trade: {}", e))?;
+    let trade_chain_id = trade.chain_id as u64;
+    
+    let blockchain_client = state.get_blockchain_client(trade_chain_id)
+        .ok_or_else(|| format!("Blockchain not enabled for chain {}", trade_chain_id))?;
     
     // Get input streams from cache
     let input_streams = {

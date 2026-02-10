@@ -33,10 +33,10 @@ pub struct EthereumClient {
     chain_id: u64,
 }
 
-// Gas price constant for Base L2
+// Gas price constant for Base L2 (not used on Ethereum mainnet)
 // Base network gas can fluctuate - using 0.03 gwei for reliable inclusion
 // (network has been seen at 0.018+ gwei during busy periods)
-const LOW_GAS_PRICE_WEI: u64 = 30_000_000; // 0.03 gwei
+const BASE_L2_GAS_PRICE_WEI: u64 = 30_000_000; // 0.03 gwei
 
 impl EthereumClient {
     /// Create a new Ethereum client from config
@@ -86,6 +86,13 @@ impl EthereumClient {
         })
     }
 
+    /// Whether this client is connected to a L2 chain (Base, Optimism, etc.)
+    /// L2 chains use fixed low gas prices; L1 (Ethereum) uses dynamic pricing
+    fn is_l2(&self) -> bool {
+        // Base mainnet = 8453, Base Goerli = 84531, Base Sepolia = 84532
+        matches!(self.chain_id, 8453 | 84531 | 84532)
+    }
+    
     // ============ Core Function: Submit Proof ============
 
     /// Submit proof to settle a trade
@@ -132,10 +139,11 @@ impl EthereumClient {
                 EthereumClientError::ContractError(format!("Gas estimation failed: {}", e))
             })?;
         
-        call = call
-            .gas(gas_estimate * 120 / 100) // 20% buffer
-            .legacy()
-            .gas_price(U256::from(LOW_GAS_PRICE_WEI));
+        call = call.gas(gas_estimate * 120 / 100); // 20% buffer
+        if self.is_l2() {
+            call = call.legacy().gas_price(U256::from(BASE_L2_GAS_PRICE_WEI));
+        }
+        // On L1 (Ethereum), let the provider use dynamic gas pricing (EIP-1559)
         
         let tx = call
             .send()
@@ -145,7 +153,7 @@ impl EthereumClient {
             })?;
 
         let tx_hash = tx.tx_hash();
-        tracing::info!("submitProof tx sent: {:#x}", tx_hash);
+        tracing::info!("submitProof tx sent on chain {}: {:#x}", self.chain_id, tx_hash);
 
         // Wait for confirmation
         let receipt = tx
@@ -496,10 +504,11 @@ impl EthereumClient {
         let gas_estimate = call.estimate_gas().await
             .map_err(|e| EthereumClientError::ContractError(format!("Gas estimation failed: {}", e)))?;
         
-        // Send with gas buffer and standard gas price (0.03 gwei for Base L2)
-        let call = call.gas(gas_estimate * 120 / 100);
-        let call = call.legacy();
-        let call = call.gas_price(U256::from(LOW_GAS_PRICE_WEI));
+        // Send with gas buffer, chain-aware gas pricing
+        let mut call = call.gas(gas_estimate * 120 / 100);
+        if self.is_l2() {
+            call = call.legacy().gas_price(U256::from(BASE_L2_GAS_PRICE_WEI));
+        }
         let tx = call.send().await
             .map_err(|e| EthereumClientError::TransactionFailed(format!("Failed to update public key hash: {}", e)))?;
 
@@ -544,10 +553,10 @@ impl EthereumClient {
                 EthereumClientError::ContractError(format!("Gas estimation failed: {}", e))
             })?;
         
-        call = call
-            .gas(gas_estimate * 120 / 100) // 20% buffer
-            .legacy()
-            .gas_price(U256::from(LOW_GAS_PRICE_WEI));
+        call = call.gas(gas_estimate * 120 / 100); // 20% buffer
+        if self.is_l2() {
+            call = call.legacy().gas_price(U256::from(BASE_L2_GAS_PRICE_WEI));
+        }
         
         let tx = call
             .send()
@@ -617,12 +626,11 @@ impl EthereumClient {
             hex::encode(trade_id),
         );
 
-        // Use legacy transaction with standard gas price for Base L2
-        // Base L2 has very low gas costs, no need for priority fees
-        let call = self.escrow_contract
-            .cancel_expired_trade(trade_id)
-            .legacy()
-            .gas_price(U256::from(LOW_GAS_PRICE_WEI)); // 0.03 gwei - standard for Base L2
+        // Configure gas pricing based on chain type
+        let mut call = self.escrow_contract.cancel_expired_trade(trade_id);
+        if self.is_l2() {
+            call = call.legacy().gas_price(U256::from(BASE_L2_GAS_PRICE_WEI));
+        }
 
         let tx = call
             .send()

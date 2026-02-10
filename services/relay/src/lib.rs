@@ -16,7 +16,7 @@ pub mod blockchain;
 pub mod axiom_prover;
 pub mod email;
 
-pub use config::Config;
+pub use config::{Config, ChainConfig};
 pub use db::{Database, DbError, DbResult};
 pub use api::{AppState, create_router};
 pub use email::{EmailService, EmailEvent, EmailInfo};

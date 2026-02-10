@@ -285,10 +285,6 @@ pub async fn create_trade_handler(
         request.fiat_amount
     );
 
-    // Get blockchain client
-    let blockchain_client = state.blockchain_client.as_ref()
-        .ok_or_else(|| ApiError::ServiceUnavailable("Blockchain client not available".to_string()))?;
-
     // Parse order ID (bytes32)
     let order_id_hex = request.order_id.strip_prefix("0x").unwrap_or(&request.order_id);
     let order_id_bytes = hex::decode(order_id_hex)
@@ -300,6 +296,17 @@ pub async fn create_trade_handler(
     
     let mut order_id: [u8; 32] = [0u8; 32];
     order_id.copy_from_slice(&order_id_bytes);
+
+    // Look up the order to determine which chain to use
+    let order = state.db.get_order(&request.order_id).await
+        .map_err(|_| ApiError::NotFound(format!("Order not found: {}", request.order_id)))?;
+    let chain_id = order.chain_id as u64;
+    
+    // Get the correct blockchain client for this order's chain
+    let blockchain_client = state.get_blockchain_client(chain_id)
+        .ok_or_else(|| ApiError::ServiceUnavailable(
+            format!("Blockchain client not available for chain {}", chain_id)
+        ))?;
 
     // Parse buyer address
     let buyer_address: Address = request.buyer_address.parse()
@@ -314,16 +321,17 @@ pub async fn create_trade_handler(
         return Err(ApiError::BadRequest("fiat_amount must be whole yuan (divisible by 100)".to_string()));
     }
 
-    // Call fillOrder on-chain via relay wallet
+    // Call fillOrder on-chain via relay wallet (using correct chain client)
     let (tx_hash, trade_id) = blockchain_client.fill_order(order_id, buyer_address, fiat_amount)
         .await
-        .map_err(|e| ApiError::BlockchainError(format!("fillOrder failed: {}", e)))?;
+        .map_err(|e| ApiError::BlockchainError(format!("fillOrder failed on chain {}: {}", chain_id, e)))?;
 
     let trade_id_hex = format!("0x{}", hex::encode(trade_id));
     let tx_hash_hex = format!("{:#x}", tx_hash);
 
     tracing::info!(
-        "Trade created: trade_id={}, tx_hash={}",
+        "Trade created on chain {}: trade_id={}, tx_hash={}",
+        chain_id,
         trade_id_hex,
         tx_hash_hex
     );

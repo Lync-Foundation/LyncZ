@@ -7,6 +7,7 @@
 //! The relay wallet pays gas fees for each cancellation (~0.0001 ETH on L2).
 
 use std::sync::Arc;
+use std::collections::HashMap;
 use std::time::Duration;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use lyncz_relay::{Config, Database};
@@ -41,20 +42,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db = Database::new(&config.database_url).await?;
     tracing::info!("✅ Database connected");
 
-    // Initialize blockchain client
-    let eth_client = EthereumClient::from_config(&config).await?;
-    let eth_client = Arc::new(eth_client);
-    tracing::info!("✅ Blockchain client initialized");
-    tracing::info!("   Relayer address: {:?}", eth_client.relayer_address());
+    // Initialize blockchain clients for all configured chains
+    let private_key = config.relayer_private_key.as_ref()
+        .ok_or("RELAYER_PRIVATE_KEY not set")?;
+    
+    let mut clients: HashMap<u64, Arc<EthereumClient>> = HashMap::new();
+    
+    for chain_config in &config.chains {
+        let escrow_address: ethers::types::Address = chain_config.escrow_address.parse()?;
+        
+        match EthereumClient::new(
+            &chain_config.rpc_url,
+            private_key,
+            escrow_address,
+            chain_config.chain_id,
+        ).await {
+            Ok(client) => {
+                let client = Arc::new(client);
+                tracing::info!("✅ Blockchain client for {} (chain {}), relayer: {:?}", 
+                    chain_config.name, chain_config.chain_id, client.relayer_address());
+                clients.insert(chain_config.chain_id, client);
+            }
+            Err(e) => {
+                tracing::warn!("⚠️ Failed to init client for {} (chain {}): {}", 
+                    chain_config.name, chain_config.chain_id, e);
+            }
+        }
+    }
+    
+    if clients.is_empty() {
+        return Err("No blockchain clients initialized".into());
+    }
 
     // Track total gas spent for logging
     let mut total_gas_spent_wei: u128 = 0;
     let mut total_trades_cancelled: u64 = 0;
 
-    tracing::info!("🔄 Starting monitoring loop (check every {} seconds)", CHECK_INTERVAL_SECS);
+    tracing::info!("🔄 Starting monitoring loop (check every {} seconds, {} chain(s))", 
+        CHECK_INTERVAL_SECS, clients.len());
 
     loop {
-        match check_and_cancel_expired(&db, &eth_client).await {
+        match check_and_cancel_expired(&db, &clients).await {
             Ok((cancelled_count, gas_spent)) => {
                 if cancelled_count > 0 {
                     total_trades_cancelled += cancelled_count;
@@ -81,13 +109,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-/// Check for expired trades and cancel them
+/// Check for expired trades and cancel them using the correct chain's client
 /// Returns (number_cancelled, total_gas_spent_wei)
 async fn check_and_cancel_expired(
     db: &Database,
-    eth_client: &Arc<EthereumClient>,
+    clients: &HashMap<u64, Arc<EthereumClient>>,
 ) -> Result<(u64, u128), Box<dyn std::error::Error + Send + Sync>> {
-    // Get all expired pending trades from database
+    // Get all expired pending trades from database (across all chains)
     let expired_trades = db.get_expired_pending_trades().await?;
     
     if expired_trades.is_empty() {
@@ -101,17 +129,28 @@ async fn check_and_cancel_expired(
 
     for trade in expired_trades {
         let trade_id = &trade.trade_id;
+        let trade_chain_id = trade.chain_id as u64;
+        
+        // Get the correct blockchain client for this trade's chain
+        let eth_client = match clients.get(&trade_chain_id) {
+            Some(client) => client,
+            None => {
+                tracing::warn!("⚠️ No client for chain {} (trade {}), skipping", trade_chain_id, trade_id);
+                continue;
+            }
+        };
         
         // Parse trade_id to bytes32
         let trade_id_bytes = parse_trade_id(trade_id)?;
         
-        tracing::info!("🔄 Cancelling trade: {}", trade_id);
+        tracing::info!("🔄 Cancelling trade {} on chain {}", trade_id, trade_chain_id);
         
         match eth_client.cancel_expired_trade(trade_id_bytes).await {
             Ok((tx_hash, gas_cost)) => {
                 tracing::info!(
-                    "✅ Trade {} cancelled: tx={:#x}, gas_cost={} wei ({:.6} ETH)",
+                    "✅ Trade {} cancelled on chain {}: tx={:#x}, gas_cost={} wei ({:.6} ETH)",
                     trade_id,
+                    trade_chain_id,
                     tx_hash,
                     gas_cost,
                     gas_cost.as_u128() as f64 / 1e18
@@ -126,13 +165,10 @@ async fn check_and_cancel_expired(
                 total_gas_wei += gas_cost.as_u128();
             }
             Err(e) => {
-                // This can happen if:
-                // - Trade was already cancelled by someone else
-                // - Trade was settled just in time
-                // - Transaction reverted for other reasons
                 tracing::warn!(
-                    "⚠️ Failed to cancel trade {}: {}",
+                    "⚠️ Failed to cancel trade {} on chain {}: {}",
                     trade_id,
+                    trade_chain_id,
                     e
                 );
             }
