@@ -68,11 +68,6 @@ export const api = {
     return response.data;
   },
 
-  async getOrder(orderId: string): Promise<Order> {
-    const response = await axios.get(`${API_BASE}/api/orders/${orderId}`);
-    return response.data;
-  },
-
   async getOrderByPrivateCode(privateCode: string): Promise<Order> {
     const response = await axios.get(`${API_BASE}/api/orders/private/${privateCode}`);
     return response.data;
@@ -172,16 +167,6 @@ export const api = {
       validation_details: data.message ?? data.validation_details,
       validation_code: data.validation_code,
     };
-  },
-
-  // Step 2: Generate proof and settle on-chain (~2-3 min)
-  async settleTrade(tradeId: string): Promise<{
-    success: boolean;
-    tx_hash?: string;
-    message: string;
-  }> {
-    const response = await axios.post(`${API_BASE}/api/trades/${tradeId}/settle`);
-    return response.data;
   },
 
   getPdfUrl(tradeId: string): string {

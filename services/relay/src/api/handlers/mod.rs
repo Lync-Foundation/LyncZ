@@ -27,9 +27,9 @@ use crate::api::{
 };
 
 // Re-export handlers
-pub use orders::{get_active_orders, get_order, get_order_activities, get_order_by_private_code, set_order_visibility, submit_payment_info};
+pub use orders::{get_active_orders, get_order_activities, get_order_by_private_code, set_order_visibility, submit_payment_info};
 pub use trades::{get_trade_handler, get_trades_by_buyer_handler, get_trades_by_seller_handler, create_trade_handler};
-pub use settlement::{validate_handler, settle_handler};
+pub use settlement::validate_handler;
 
 /// Health check endpoint
 pub async fn health_check(State(state): State<AppState>) -> ApiResult<Json<HealthResponse>> {

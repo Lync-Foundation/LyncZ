@@ -110,16 +110,6 @@ pub async fn get_active_orders(
     }))
 }
 
-/// GET /api/orders/:order_id
-/// Get single order by ID
-pub async fn get_order(
-    State(state): State<AppState>,
-    Path(order_id): Path<String>,
-) -> ApiResult<Json<OrderDto>> {
-    let order = state.db.get_order(&order_id).await?;
-    Ok(Json(order_to_dto(order)))
-}
-
 /// GET /api/orders/private/:code
 /// Get order by private code (for unlisted orders)
 #[axum::debug_handler]

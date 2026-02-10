@@ -1,8 +1,7 @@
 //! Settlement handlers - PDF validation and proof submission
 //! 
-//! Two-step flow:
-//! 1. POST /validate - Upload PDF + Quick validation (~10 seconds)
-//! 2. POST /settle   - Generate proof + Submit to blockchain (~2-3 minutes)
+//! Flow:
+//! 1. POST /validate - Upload PDF, validate, generate proof + settle (~2-3 minutes)
 //!
 //! Data sources:
 //! - ORDER: alipay_name (line 20), alipay_id → masked (line 21)
@@ -521,135 +520,6 @@ async fn run_background_settlement_inner(
 // ============================================================================
 // Settlement Endpoint
 // ============================================================================
-
-#[derive(Debug, Serialize)]
-pub struct SettleResponse {
-    pub success: bool,
-    pub tx_hash: String,
-    pub message: String,
-}
-
-/// POST /api/trades/:trade_id/settle
-/// Generate ZK proof and submit to blockchain (~2-3 minutes)
-pub async fn settle_handler(
-    State(state): State<AppState>,
-    Path(trade_id): Path<String>,
-) -> ApiResult<Json<SettleResponse>> {
-    let blockchain_client = state.blockchain_client
-        .as_ref()
-        .ok_or_else(|| ApiError::ServiceUnavailable("Blockchain not enabled".to_string()))?;
-    
-    let trade = state.db.get_trade(&trade_id).await
-        .map_err(|e| ApiError::Database(e.to_string()))?;
-    
-    // Check if trade is already settled
-    if trade.status == 1 {
-        tracing::info!("⏭️ Trade {} already settled, skipping", trade_id);
-        return Ok(Json(SettleResponse {
-            success: true,
-            tx_hash: trade.settlement_tx_hash.unwrap_or_default(),
-            message: "Trade already settled".to_string(),
-        }));
-    }
-    
-    // Check if proof generation is already in progress (has axiom_proof_id but not settled)
-    if trade.axiom_proof_id.is_some() && trade.status == 0 {
-        tracing::info!("⏭️ Trade {} already has proof in progress ({}), skipping duplicate request", 
-            trade_id, trade.axiom_proof_id.as_ref().unwrap());
-        return Err(ApiError::BadRequest("Proof generation already in progress. Please wait.".to_string()));
-    }
-    
-    tracing::info!("🔐 Starting settlement for trade {}", trade_id);
-    
-    if trade.pdf_file.is_none() {
-        return Err(ApiError::BadRequest("No PDF uploaded. Call /validate first.".to_string()));
-    }
-    
-    let transaction_id = trade.transaction_id.clone()
-        .ok_or_else(|| ApiError::BadRequest("No transaction_id. Call /validate first.".to_string()))?;
-    let payment_time = trade.payment_time.clone()
-        .ok_or_else(|| ApiError::BadRequest("No payment_time. Call /validate first.".to_string()))?;
-    
-    let input_streams = {
-        let cache = state.input_streams_cache.read().await;
-        cache.get(&trade_id).cloned()
-    }.ok_or_else(|| ApiError::BadRequest("PDF not validated. Call /validate first.".to_string()))?;
-    
-    // Generate EVM proof
-    let api_key = std::env::var("AXIOM_API_KEY")
-        .map_err(|_| ApiError::Internal("AXIOM_API_KEY not set".to_string()))?;
-    let program_id = std::env::var("AXIOM_PROGRAM_ID")
-        .map_err(|_| ApiError::Internal("AXIOM_PROGRAM_ID not set".to_string()))?;
-    
-    let axiom = AxiomProver::new(api_key, String::new(), program_id);
-    
-    tracing::info!("🚀 Generating ZK proof...");
-    let proof = axiom.generate_evm_proof(&trade_id, input_streams).await
-        .map_err(|e| ApiError::Internal(format!("Proof generation failed: {}", e)))?;
-    tracing::info!("✅ Proof generated: {}", proof.proof_id);
-    
-    // Save proof to database
-    let proof_json = serde_json::to_string(&proof.full_json)
-        .map_err(|e| ApiError::Internal(format!("JSON serialization failed: {}", e)))?;
-    
-    state.db.save_trade_proof(
-        &trade_id,
-        &proof.user_public_values,
-        &proof.accumulator,
-        &proof.proof_data,
-        &proof.proof_id,
-        &proof_json,
-    ).await.map_err(|e| ApiError::Database(e.to_string()))?;
-    
-    // Submit to blockchain
-    tracing::info!("📤 Submitting proof to blockchain...");
-    
-    let trade_id_bytes = trade_id_to_bytes32(&trade_id)
-        .map_err(|e| ApiError::BadRequest(format!("Invalid trade ID: {}", e)))?;
-    
-    let mut user_public_values = [0u8; 32];
-    user_public_values.copy_from_slice(&proof.user_public_values);
-    
-    // Compute tx_id_hash from transaction_id (v4 privacy: txId never on-chain)
-    let tx_id_hash = compute_tx_id_hash(&transaction_id);
-    tracing::info!("🔐 tx_id_hash: 0x{}", hex::encode(tx_id_hash));
-    
-    let tx_hash = blockchain_client.submit_proof(
-        trade_id_bytes,
-        tx_id_hash,
-        payment_time,
-        user_public_values,
-        proof.accumulator,
-        proof.proof_data,
-    ).await.map_err(|e| {
-        let msg = e.to_string();
-        if msg.contains("PaymentDetailsMismatch") {
-            ApiError::BadRequest("Proof rejected: payment details mismatch".to_string())
-        } else if msg.contains("TradeExpired") {
-            ApiError::BadRequest("Trade expired".to_string())
-        } else if msg.contains("TradeAlreadySettled") {
-            ApiError::BadRequest("Trade already settled".to_string())
-        } else if msg.contains("TransactionIdAlreadyUsed") {
-            ApiError::BadRequest("Transaction ID already used".to_string())
-        } else {
-            ApiError::BlockchainError(msg)
-        }
-    })?;
-    
-    tracing::info!("✅ Settlement complete: {:?}", tx_hash);
-    
-    // Clear cache
-    {
-        let mut cache = state.input_streams_cache.write().await;
-        cache.remove(&trade_id);
-    }
-    
-    Ok(Json(SettleResponse {
-        success: true,
-        tx_hash: format!("{:?}", tx_hash),
-        message: "Trade settled successfully!".to_string(),
-    }))
-}
 
 // ============================================================================
 // OpenVM Stream Generation
