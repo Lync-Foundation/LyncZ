@@ -335,7 +335,7 @@ pub async fn get_order_activities(
     let mut activities: Vec<OrderActivity> = Vec::new();
     
     // Get fee rate from blockchain config (cached) - used only as fallback
-    let fee_rate_bps: u128 = match state.get_config(false).await {
+    let fee_rate_bps: u128 = match state.get_config_for_chain(order.chain_id as u64, false).await {
         Ok(config) => config.fee_rate_bps.parse().unwrap_or(100), // Default 1% if parsing fails
         Err(_) => 100, // Default 1% if config fetch fails
     };
@@ -529,9 +529,13 @@ pub async fn submit_payment_info(
         computed_hash_hex
     );
     
+    // Fetch order to get its chain_id for blockchain verification
+    let order = state.db.get_order(&order_id).await
+        .map_err(|_| ApiError::BadRequest(format!("Order {} not found", order_id)))?;
+    
     // Verify against blockchain with retry (handles RPC node sync delays)
     // The frontend waits for tx confirmation, but our RPC node might be slightly behind
-    if let Some(blockchain_client) = &state.blockchain_client {
+    if let Some(blockchain_client) = state.get_blockchain_client(order.chain_id as u64) {
         const MAX_RETRIES: u32 = 3;
         const RETRY_DELAY_SECS: u64 = 3;
         
@@ -577,18 +581,18 @@ pub async fn submit_payment_info(
             )));
         }
     } else {
-        tracing::warn!("⚠️ Blockchain client not configured, skipping hash verification");
+        tracing::warn!("⚠️ Blockchain client not configured for chain {}, skipping hash verification", order.chain_id);
     }
     
     // Check if payment info already exists (updates not allowed - user must create new order)
-    if let Ok(existing_order) = state.db.get_order(&order_id).await {
-        if !existing_order.alipay_id.is_empty() && !existing_order.alipay_name.is_empty() {
+    {
+        if !order.alipay_id.is_empty() && !order.alipay_name.is_empty() {
             tracing::warn!("❌ Payment info update rejected for order {} - updates not allowed", order_id);
             return Err(ApiError::BadRequest(
                 "Payment info already set. Updates are not allowed. Please create a new order if you need different payment details.".to_string()
             ));
         }
-    }
+    };
     
     // Store plain text in database (initial submission only)
     state.db.update_payment_info(&order_id, &req.account_id, &req.account_name).await?;

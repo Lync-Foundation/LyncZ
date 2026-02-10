@@ -1,8 +1,8 @@
 //! Configuration management for LyncZ relay backend
 //! 
-//! Loads configuration from environment variables.
-//! Most blockchain-related values (verifier addresses, trade limits, etc.)
-//! are fetched directly from the smart contracts at runtime.
+//! Two chains supported as equal peers: Base (8453) and Ethereum (1).
+//! Each chain has its own RPC URL and escrow contract address.
+//! The relay wallet (private key) is shared across all chains.
 
 use std::env;
 
@@ -15,7 +15,7 @@ pub struct ChainConfig {
     pub name: String,          // "Base" or "Ethereum"
 }
 
-/// Main configuration struct - only essential runtime values
+/// Main configuration struct - no primary chain, both are equal peers
 #[derive(Debug, Clone)]
 pub struct Config {
     // Database
@@ -25,12 +25,7 @@ pub struct Config {
     pub api_host: String,
     pub api_port: u16,
     
-    // Primary chain (Base Mainnet by default)
-    pub chain_id: u64,
-    pub rpc_url: String,
-    pub escrow_address: String,
-    
-    // All supported chains (populated from env vars)
+    // All supported chains (Base + Ethereum)
     pub chains: Vec<ChainConfig>,
     
     // Relayer (for signing transactions - same wallet for all chains)
@@ -45,6 +40,16 @@ pub struct Config {
 
 impl Config {
     /// Load configuration from environment variables
+    /// 
+    /// Chain config env vars (both optional - service starts with whichever chains are configured):
+    /// 
+    /// Base (chain 8453):
+    ///   CHAIN_ID + RPC_URL + ESCROW_ADDRESS  (legacy, maps to Base)
+    ///   — OR —
+    ///   BASE_RPC_URL + BASE_ESCROW_ADDRESS   (explicit)
+    ///
+    /// Ethereum (chain 1):
+    ///   ETH_RPC_URL + ETH_ESCROW_ADDRESS
     pub fn load() -> Result<Self, ConfigError> {
         // Database (required for production, has dev default)
         let database_url = env::var("DATABASE_URL")
@@ -58,20 +63,6 @@ impl Config {
             .parse()
             .unwrap_or(8080);
         
-        // Blockchain
-        let chain_id = env::var("CHAIN_ID")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(8453); // Base mainnet default
-        
-        let rpc_url = env::var("RPC_URL")
-            .unwrap_or_else(|_| "https://mainnet.base.org".to_string());
-        
-        // Escrow contract address (required)
-        let escrow_address = env::var("ESCROW_ADDRESS")
-            .or_else(|_| env::var("ESCROW_CONTRACT_ADDRESS"))
-            .map_err(|_| ConfigError::Missing("ESCROW_ADDRESS".to_string()))?;
-        
         // Relayer private key (for fillOrder, submitProof, cancelExpiredTrade)
         let relayer_private_key = env::var("RELAYER_PRIVATE_KEY").ok();
         
@@ -81,56 +72,61 @@ impl Config {
         // Resend API key (for email notifications)
         let resend_api_key = env::var("RESEND_API_KEY").ok();
         
-        // Build chain configs
-        let mut chains = vec![
-            ChainConfig {
-                chain_id,
-                rpc_url: rpc_url.clone(),
-                escrow_address: escrow_address.clone(),
-                name: if chain_id == 1 { "Ethereum".to_string() } else { "Base".to_string() },
-            },
-        ];
+        // ====== Build chain configs (both chains are equal peers) ======
+        let mut chains = Vec::new();
         
-        // Optional: Ethereum Mainnet config (ETH_RPC_URL + ETH_ESCROW_ADDRESS)
-        if let (Ok(eth_rpc), Ok(eth_escrow)) = (env::var("ETH_RPC_URL"), env::var("ETH_ESCROW_ADDRESS")) {
-            let eth_chain_id: u64 = env::var("ETH_CHAIN_ID")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(1); // Ethereum mainnet default
-            
-            chains.push(ChainConfig {
-                chain_id: eth_chain_id,
-                rpc_url: eth_rpc,
-                escrow_address: eth_escrow,
-                name: "Ethereum".to_string(),
-            });
-        }
+        // --- Base chain (8453) ---
+        // Try explicit BASE_* vars first, fall back to legacy CHAIN_ID/RPC_URL/ESCROW_ADDRESS
+        let base_rpc = env::var("BASE_RPC_URL")
+            .or_else(|_| env::var("RPC_URL"));
+        let base_escrow = env::var("BASE_ESCROW_ADDRESS")
+            .or_else(|_| env::var("ESCROW_ADDRESS"))
+            .or_else(|_| env::var("ESCROW_CONTRACT_ADDRESS"));
         
-        // Optional: Base config when primary is ETH (BASE_RPC_URL + BASE_ESCROW_ADDRESS)
-        if let (Ok(base_rpc), Ok(base_escrow)) = (env::var("BASE_RPC_URL"), env::var("BASE_ESCROW_ADDRESS")) {
-            let base_chain_id: u64 = env::var("BASE_CHAIN_ID")
+        if let (Ok(rpc), Ok(escrow)) = (base_rpc, base_escrow) {
+            let chain_id = env::var("BASE_CHAIN_ID")
+                .or_else(|_| env::var("CHAIN_ID"))
                 .ok()
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(8453);
             
-            // Only add if not already the primary chain
-            if !chains.iter().any(|c| c.chain_id == base_chain_id) {
-                chains.push(ChainConfig {
-                    chain_id: base_chain_id,
-                    rpc_url: base_rpc,
-                    escrow_address: base_escrow,
-                    name: "Base".to_string(),
-                });
-            }
+            chains.push(ChainConfig {
+                chain_id,
+                rpc_url: rpc,
+                escrow_address: escrow,
+                name: "Base".to_string(),
+            });
+        }
+        
+        // --- Ethereum chain (1) ---
+        let eth_rpc = env::var("ETH_RPC_URL");
+        let eth_escrow = env::var("ETH_ESCROW_ADDRESS");
+        
+        if let (Ok(rpc), Ok(escrow)) = (eth_rpc, eth_escrow) {
+            let chain_id = env::var("ETH_CHAIN_ID")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(1);
+            
+            chains.push(ChainConfig {
+                chain_id,
+                rpc_url: rpc,
+                escrow_address: escrow,
+                name: "Ethereum".to_string(),
+            });
+        }
+        
+        // At least one chain must be configured
+        if chains.is_empty() {
+            return Err(ConfigError::Missing(
+                "No chain configured. Set RPC_URL+ESCROW_ADDRESS (Base) and/or ETH_RPC_URL+ETH_ESCROW_ADDRESS (Ethereum)".to_string()
+            ));
         }
         
         Ok(Config {
             database_url,
             api_host,
             api_port,
-            chain_id,
-            rpc_url,
-            escrow_address,
             chains,
             relayer_private_key,
             axiom_api_key,
@@ -138,10 +134,15 @@ impl Config {
         })
     }
     
+    /// Get chain config by chain_id (convenience helper)
+    pub fn get_chain(&self, chain_id: u64) -> Option<&ChainConfig> {
+        self.chains.iter().find(|c| c.chain_id == chain_id)
+    }
+    
     /// Log current configuration (hiding secrets)
     pub fn log_summary(&self) {
         tracing::info!("=== LyncZ Configuration ===");
-        tracing::info!("Supported chains: {}", self.chains.len());
+        tracing::info!("Chains: {} configured", self.chains.len());
         for chain in &self.chains {
             tracing::info!("  {} (chain_id={}): escrow={}, rpc={}...", 
                 chain.name, chain.chain_id, chain.escrow_address,

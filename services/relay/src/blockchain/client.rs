@@ -12,7 +12,6 @@ use thiserror::Error;
 
 use super::{LyncZEscrow, AlipayVerifier, SimpleFeeCalculator};
 use super::types::ContractConfig;
-use crate::config::Config;
 
 #[derive(Error, Debug)]
 pub enum EthereumClientError {
@@ -33,28 +32,18 @@ pub struct EthereumClient {
     chain_id: u64,
 }
 
-// Gas price constant for Base L2 (not used on Ethereum mainnet)
-// Base network gas can fluctuate - using 0.03 gwei for reliable inclusion
-// (network has been seen at 0.018+ gwei during busy periods)
+// Gas price caps per chain type
+// Using fixed legacy gas prices for predictable costs.
+//
+// Base L2: Very stable ~0.01-0.03 gwei
 const BASE_L2_GAS_PRICE_WEI: u64 = 30_000_000; // 0.03 gwei
+//
+// Ethereum L1: Currently ~0.065 gwei (Jan 2026), can spike during congestion
+// Cap at 0.5 gwei - generous headroom above current 0.065 gwei base fee
+// If gas exceeds this cap, transactions will wait until fees drop
+const ETH_L1_GAS_PRICE_WEI: u64 = 500_000_000; // 0.5 gwei
 
 impl EthereumClient {
-    /// Create a new Ethereum client from config
-    pub async fn from_config(config: &Config) -> Result<Self, EthereumClientError> {
-        let private_key = config.relayer_private_key.as_ref()
-            .ok_or_else(|| EthereumClientError::WalletError("RELAYER_PRIVATE_KEY not set".to_string()))?;
-        
-        let escrow_address: Address = config.escrow_address.parse()
-            .map_err(|e| EthereumClientError::WalletError(format!("Invalid escrow address: {}", e)))?;
-        
-        Self::new(
-            &config.rpc_url,
-            private_key,
-            escrow_address,
-            config.chain_id,
-        ).await
-    }
-
     pub async fn new(
         rpc_url: &str,
         private_key: &str,
@@ -86,11 +75,17 @@ impl EthereumClient {
         })
     }
 
-    /// Whether this client is connected to a L2 chain (Base, Optimism, etc.)
-    /// L2 chains use fixed low gas prices; L1 (Ethereum) uses dynamic pricing
-    fn is_l2(&self) -> bool {
-        // Base mainnet = 8453, Base Goerli = 84531, Base Sepolia = 84532
-        matches!(self.chain_id, 8453 | 84531 | 84532)
+    /// Get the gas price cap for this chain (in Wei)
+    /// All chains use capped legacy gas prices for predictable relay costs.
+    fn gas_price_cap(&self) -> u64 {
+        match self.chain_id {
+            // Base L2: very low gas, 0.03 gwei cap
+            8453 | 84531 | 84532 => BASE_L2_GAS_PRICE_WEI,
+            // Ethereum L1: moderate gas, 0.5 gwei cap
+            1 | 5 | 11155111 => ETH_L1_GAS_PRICE_WEI,
+            // Unknown chains: use ETH L1 cap as safe default
+            _ => ETH_L1_GAS_PRICE_WEI,
+        }
     }
     
     // ============ Core Function: Submit Proof ============
@@ -139,11 +134,10 @@ impl EthereumClient {
                 EthereumClientError::ContractError(format!("Gas estimation failed: {}", e))
             })?;
         
-        call = call.gas(gas_estimate * 120 / 100); // 20% buffer
-        if self.is_l2() {
-            call = call.legacy().gas_price(U256::from(BASE_L2_GAS_PRICE_WEI));
-        }
-        // On L1 (Ethereum), let the provider use dynamic gas pricing (EIP-1559)
+        call = call
+            .gas(gas_estimate * 120 / 100) // 20% buffer
+            .legacy()
+            .gas_price(U256::from(self.gas_price_cap()));
         
         let tx = call
             .send()
@@ -504,11 +498,9 @@ impl EthereumClient {
         let gas_estimate = call.estimate_gas().await
             .map_err(|e| EthereumClientError::ContractError(format!("Gas estimation failed: {}", e)))?;
         
-        // Send with gas buffer, chain-aware gas pricing
+        // Send with gas buffer and per-chain gas cap
         let mut call = call.gas(gas_estimate * 120 / 100);
-        if self.is_l2() {
-            call = call.legacy().gas_price(U256::from(BASE_L2_GAS_PRICE_WEI));
-        }
+        call = call.legacy().gas_price(U256::from(self.gas_price_cap()));
         let tx = call.send().await
             .map_err(|e| EthereumClientError::TransactionFailed(format!("Failed to update public key hash: {}", e)))?;
 
@@ -553,10 +545,10 @@ impl EthereumClient {
                 EthereumClientError::ContractError(format!("Gas estimation failed: {}", e))
             })?;
         
-        call = call.gas(gas_estimate * 120 / 100); // 20% buffer
-        if self.is_l2() {
-            call = call.legacy().gas_price(U256::from(BASE_L2_GAS_PRICE_WEI));
-        }
+        call = call
+            .gas(gas_estimate * 120 / 100) // 20% buffer
+            .legacy()
+            .gas_price(U256::from(self.gas_price_cap()));
         
         let tx = call
             .send()
@@ -626,12 +618,9 @@ impl EthereumClient {
             hex::encode(trade_id),
         );
 
-        // Configure gas pricing based on chain type
+        // Configure gas pricing with per-chain cap
         let mut call = self.escrow_contract.cancel_expired_trade(trade_id);
-        if self.is_l2() {
-            call = call.legacy().gas_price(U256::from(BASE_L2_GAS_PRICE_WEI));
-        }
-
+        call = call.legacy().gas_price(U256::from(self.gas_price_cap()));
         let tx = call
             .send()
             .await

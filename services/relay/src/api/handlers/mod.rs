@@ -71,8 +71,11 @@ pub async fn get_contract_config(
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let force_refresh = params.get("refresh").map(|v| v == "true").unwrap_or(false);
+    let chain_id: u64 = params.get("chain_id")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(8453);
     
-    let config = state.get_config(force_refresh).await
+    let config = state.get_config_for_chain(chain_id, force_refresh).await
         .map_err(|e| ApiError::BlockchainError(e))?;
     
     Ok(Json(serde_json::json!(config)))
