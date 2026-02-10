@@ -11,6 +11,7 @@ pub mod config;
 pub mod crypto;
 pub mod db;
 pub mod api;
+pub mod auth;
 pub mod blockchain;
 pub mod axiom_prover;
 pub mod email;

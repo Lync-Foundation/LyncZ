@@ -5,6 +5,7 @@ import { WagmiProvider } from '@privy-io/wagmi';
 import { PrivyProvider } from '@privy-io/react-auth';
 import { config } from '@/lib/wagmi';
 import { LocaleProvider } from './LocaleProvider';
+import { AuthInitializer } from './AuthInitializer';
 import { useState, useEffect, type ReactNode } from 'react';
 import { base } from 'wagmi/chains';
 
@@ -84,6 +85,7 @@ export function Providers({
       >
         <QueryClientProvider client={queryClient}>
           <WagmiProvider config={config}>
+            <AuthInitializer />
             {children}
           </WagmiProvider>
         </QueryClientProvider>

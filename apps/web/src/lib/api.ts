@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getAuthToken } from '@/hooks/useAuth';
 
 // Default to Railway backend
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://lyncz-web-production.up.railway.app';
@@ -62,8 +63,10 @@ export const api = {
   },
 
   async getOrdersBySeller(sellerAddress: string): Promise<{ orders: Order[] }> {
+    const token = getAuthToken();
     const response = await axios.get(`${API_BASE}/api/orders/active`, {
       params: { seller: sellerAddress.toLowerCase() },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     return response.data;
   },

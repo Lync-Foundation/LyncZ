@@ -5,6 +5,7 @@ use tokio::sync::RwLock;
 use crate::db::Database;
 use crate::blockchain::client::EthereumClient;
 use crate::blockchain::types::ContractConfig;
+use crate::auth::NonceStore;
 
 /// Cache entry with expiration
 pub struct CachedConfig {
@@ -32,6 +33,9 @@ pub struct AppState {
     
     /// Set of trade IDs currently generating proofs (prevents duplicate requests)
     pub proof_in_progress: Arc<RwLock<HashSet<String>>>,
+    
+    /// Nonce store for SIWE authentication
+    pub nonce_store: NonceStore,
 }
 
 impl AppState {
@@ -56,6 +60,7 @@ impl AppState {
             input_streams_cache: Arc::new(RwLock::new(HashMap::new())),
             config_cache: Arc::new(RwLock::new(None)),
             proof_in_progress: Arc::new(RwLock::new(HashSet::new())),
+            nonce_store: NonceStore::new(),
         })
     }
     

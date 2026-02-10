@@ -64,6 +64,11 @@ tempfile = "3.8"
 # Random number generation (for private codes)
 rand = "0.8"
 
+# Authentication (SIWE + JWT)
+siwe = "0.6"
+jsonwebtoken = "9"
+time = "0.3"
+
 [dev-dependencies]
 # Testing
 tokio-test = "0.4"

@@ -5,15 +5,17 @@
 
 use axum::{
     extract::{Path, Query, State},
+    http::HeaderMap,
     Json,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::api::{
-    error::ApiResult,
+    error::{ApiError, ApiResult},
     state::AppState,
 };
+use crate::auth;
 use crate::email::format_token_amount;
 
 // ================================================================
@@ -82,12 +84,30 @@ pub struct OrderListResponse {
 
 /// GET /api/orders/active
 /// Get list of active sell orders (remaining_amount > 0)
+/// 
+/// When ?seller= is provided, authentication is REQUIRED.
+/// The caller must provide a valid JWT proving they own the seller wallet.
+/// This prevents anyone from enumerating a seller's private orders.
 pub async fn get_active_orders(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Query(params): Query<OrderQueryParams>,
 ) -> ApiResult<Json<OrderListResponse>> {
     let orders = if let Some(seller) = params.seller {
-        // Get orders by seller
+        // AUTHENTICATED: Seller-specific query requires JWT proof of wallet ownership
+        let auth_header = headers.get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .ok_or_else(|| ApiError::Unauthorized("Authentication required to view seller orders. Please sign in with your wallet.".to_string()))?;
+        
+        let authenticated_address = auth::verify_jwt(auth_header)
+            .map_err(|e| ApiError::Unauthorized(format!("Invalid authentication: {}", e)))?;
+        
+        // Verify the authenticated wallet matches the requested seller
+        if authenticated_address != seller.to_lowercase() {
+            return Err(ApiError::Unauthorized("You can only view your own orders".to_string()));
+        }
+        
+        // Get orders by seller (includes private orders — safe because we verified ownership)
         state.db.get_orders_by_seller(&seller).await?
     } else if let Some(token) = params.token {
         // Get orders by token

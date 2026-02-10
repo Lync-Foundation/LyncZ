@@ -5,12 +5,15 @@ use axum::{
 use tower_http::cors::{CorsLayer, Any};
 
 use crate::api::{handlers, state::AppState};
+use crate::auth;
 
 /// Create the API router
 /// 
 /// Endpoints:
+/// - GET  /api/auth/nonce              - Get SIWE nonce
+/// - POST /api/auth/verify             - Verify SIWE signature, get JWT
 /// - GET  /health                      - Health check
-/// - GET  /api/orders/active           - List active sell orders
+/// - GET  /api/orders/active           - List active sell orders (auth required for ?seller=)
 /// - GET  /api/orders/:id/activities   - Get order with activity timeline
 /// - GET  /api/trades/:id              - Get trade by ID
 /// - GET  /api/trades/buyer/:addr      - Get trades by buyer
@@ -22,6 +25,10 @@ pub fn create_router(state: AppState) -> Router {
         .allow_headers(Any);
 
     Router::new()
+        // Authentication (SIWE)
+        .route("/api/auth/nonce", get(auth::get_nonce))
+        .route("/api/auth/verify", post(auth::verify_siwe))
+        
         // Health
         .route("/health", get(handlers::health_check))
         

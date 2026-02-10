@@ -18,6 +18,9 @@ pub enum ApiError {
     /// Invalid request (validation errors)
     BadRequest(String),
     
+    /// Authentication required or failed (401)
+    Unauthorized(String),
+    
     /// Resource not found
     NotFound(String),
     
@@ -52,6 +55,9 @@ impl IntoResponse for ApiError {
             }
             ApiError::BadRequest(msg) => {
                 (StatusCode::BAD_REQUEST, msg)
+            }
+            ApiError::Unauthorized(msg) => {
+                (StatusCode::UNAUTHORIZED, msg)
             }
             ApiError::NotFound(msg) => {
                 (StatusCode::NOT_FOUND, msg)
