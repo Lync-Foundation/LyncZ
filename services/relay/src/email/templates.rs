@@ -3,6 +3,14 @@
 
 use super::{EmailEvent, EmailInfo, truncate_address, format_cny_amount, format_expires_at};
 
+/// Get block explorer base URL for a given chain
+fn explorer_url(chain_id: u64) -> &'static str {
+    match chain_id {
+        1 => "https://etherscan.io",
+        _ => "https://basescan.org",
+    }
+}
+
 /// Get English email subject and body
 pub fn get_email_en(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (String, String) {
     match (event, info) {
@@ -200,7 +208,8 @@ pub fn get_email_en(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (Stri
         },
         
         // Trade Settled (Seller perspective)
-        (EmailEvent::TradeSettledSeller, EmailInfo::TradeSettledSeller { order_id, trade_id, token_amount, token_symbol, cny_amount, fee_amount, buyer_address, settlement_tx }) => {
+        (EmailEvent::TradeSettledSeller, EmailInfo::TradeSettledSeller { order_id, trade_id, token_amount, token_symbol, cny_amount, fee_amount, buyer_address, settlement_tx, chain_id }) => {
+            let explorer = explorer_url(*chain_id);
             let subject = "✅ Trade Settled - Payment Received".to_string();
             let html = format_simple_email(
                 "Payment verified - crypto released!",
@@ -216,7 +225,7 @@ pub fn get_email_en(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (Stri
                     ("Platform Fee", &format!("-{} {}", fee_amount, token_symbol)),
                     ("Received", &format_cny_amount(cny_amount)),
                     ("Buyer", &truncate_address(buyer_address)),
-                    ("Settlement TX", &format!("<a href=\"https://basescan.org/tx/{}\" style=\"color: #6366f1;\">{}</a>", settlement_tx, truncate_address(settlement_tx))),
+                    ("Settlement TX", &format!("<a href=\"{}/tx/{}\" style=\"color: #6366f1;\">{}</a>", explorer, settlement_tx, truncate_address(settlement_tx))),
                 ],
                 app_url,
                 "/account",
@@ -227,7 +236,8 @@ pub fn get_email_en(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (Stri
         },
         
         // Trade Settled (Buyer perspective)
-        (EmailEvent::TradeSettledBuyer, EmailInfo::TradeSettledBuyer { order_id, trade_id, token_amount, token_symbol, settlement_tx }) => {
+        (EmailEvent::TradeSettledBuyer, EmailInfo::TradeSettledBuyer { order_id, trade_id, token_amount, token_symbol, settlement_tx, chain_id }) => {
+            let explorer = explorer_url(*chain_id);
             let subject = "🎉 Purchase Complete - Crypto Received!".to_string();
             let html = format_simple_email(
                 "Your purchase is complete!",
@@ -240,7 +250,7 @@ pub fn get_email_en(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (Stri
                     ("Order ID", &truncate_address(order_id)),
                     ("Trade ID", &truncate_address(trade_id)),
                     ("Received", &format!("{} {}", token_amount, token_symbol)),
-                    ("Settlement TX", &format!("<a href=\"https://basescan.org/tx/{}\" style=\"color: #6366f1;\">{}</a>", settlement_tx, truncate_address(settlement_tx))),
+                    ("Settlement TX", &format!("<a href=\"{}/tx/{}\" style=\"color: #6366f1;\">{}</a>", explorer, settlement_tx, truncate_address(settlement_tx))),
                 ],
                 app_url,
                 "/account",
@@ -498,7 +508,8 @@ pub fn get_email_zh_cn(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (S
         },
         
         // 交易已结算（卖家视角）
-        (EmailEvent::TradeSettledSeller, EmailInfo::TradeSettledSeller { order_id, trade_id, token_amount, token_symbol, cny_amount, fee_amount, buyer_address, settlement_tx }) => {
+        (EmailEvent::TradeSettledSeller, EmailInfo::TradeSettledSeller { order_id, trade_id, token_amount, token_symbol, cny_amount, fee_amount, buyer_address, settlement_tx, chain_id }) => {
+            let explorer = explorer_url(*chain_id);
             let subject = "✅ 交易成功结算 - 收款已确认".to_string();
             let html = format_simple_email(
                 "付款已验证 - 加密货币已释放！",
@@ -514,7 +525,7 @@ pub fn get_email_zh_cn(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (S
                     ("平台手续费", &format!("-{} {}", fee_amount, token_symbol)),
                     ("已收到", &format_cny_amount(cny_amount)),
                     ("买家", &truncate_address(buyer_address)),
-                    ("结算交易", &format!("<a href=\"https://basescan.org/tx/{}\" style=\"color: #6366f1;\">{}</a>", settlement_tx, truncate_address(settlement_tx))),
+                    ("结算交易", &format!("<a href=\"{}/tx/{}\" style=\"color: #6366f1;\">{}</a>", explorer, settlement_tx, truncate_address(settlement_tx))),
                 ],
                 app_url,
                 "/account",
@@ -525,7 +536,8 @@ pub fn get_email_zh_cn(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (S
         },
         
         // 交易已结算（买家视角）
-        (EmailEvent::TradeSettledBuyer, EmailInfo::TradeSettledBuyer { order_id, trade_id, token_amount, token_symbol, settlement_tx }) => {
+        (EmailEvent::TradeSettledBuyer, EmailInfo::TradeSettledBuyer { order_id, trade_id, token_amount, token_symbol, settlement_tx, chain_id }) => {
+            let explorer = explorer_url(*chain_id);
             let subject = "🎉 购买成功 - 加密货币已到账！".to_string();
             let html = format_simple_email(
                 "您的购买已完成！",
@@ -537,7 +549,7 @@ pub fn get_email_zh_cn(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (S
                     ("订单ID", &truncate_address(order_id)),
                     ("交易ID", &truncate_address(trade_id)),
                     ("已收到", &format!("{} {}", token_amount, token_symbol)),
-                    ("结算交易", &format!("<a href=\"https://basescan.org/tx/{}\" style=\"color: #6366f1;\">{}</a>", settlement_tx, truncate_address(settlement_tx))),
+                    ("结算交易", &format!("<a href=\"{}/tx/{}\" style=\"color: #6366f1;\">{}</a>", explorer, settlement_tx, truncate_address(settlement_tx))),
                 ],
                 app_url,
                 "/account",
@@ -794,7 +806,8 @@ pub fn get_email_zh_tw(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (S
         },
         
         // 交易已結算（賣家視角）
-        (EmailEvent::TradeSettledSeller, EmailInfo::TradeSettledSeller { order_id, trade_id, token_amount, token_symbol, cny_amount, fee_amount, buyer_address, settlement_tx }) => {
+        (EmailEvent::TradeSettledSeller, EmailInfo::TradeSettledSeller { order_id, trade_id, token_amount, token_symbol, cny_amount, fee_amount, buyer_address, settlement_tx, chain_id }) => {
+            let explorer = explorer_url(*chain_id);
             let subject = "✅ 交易成功結算 - 收款已確認".to_string();
             let html = format_simple_email(
                 "付款已驗證 - 加密貨幣已釋放！",
@@ -810,7 +823,7 @@ pub fn get_email_zh_tw(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (S
                     ("平台手續費", &format!("-{} {}", fee_amount, token_symbol)),
                     ("已收到", &format_cny_amount(cny_amount)),
                     ("買家", &truncate_address(buyer_address)),
-                    ("結算交易", &format!("<a href=\"https://basescan.org/tx/{}\" style=\"color: #6366f1;\">{}</a>", settlement_tx, truncate_address(settlement_tx))),
+                    ("結算交易", &format!("<a href=\"{}/tx/{}\" style=\"color: #6366f1;\">{}</a>", explorer, settlement_tx, truncate_address(settlement_tx))),
                 ],
                 app_url,
                 "/account",
@@ -821,7 +834,8 @@ pub fn get_email_zh_tw(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (S
         },
         
         // 交易已結算（買家視角）
-        (EmailEvent::TradeSettledBuyer, EmailInfo::TradeSettledBuyer { order_id, trade_id, token_amount, token_symbol, settlement_tx }) => {
+        (EmailEvent::TradeSettledBuyer, EmailInfo::TradeSettledBuyer { order_id, trade_id, token_amount, token_symbol, settlement_tx, chain_id }) => {
+            let explorer = explorer_url(*chain_id);
             let subject = "🎉 購買成功 - 加密貨幣已到帳！".to_string();
             let html = format_simple_email(
                 "您的購買已完成！",
@@ -833,7 +847,7 @@ pub fn get_email_zh_tw(event: EmailEvent, info: &EmailInfo, app_url: &str) -> (S
                     ("訂單ID", &truncate_address(order_id)),
                     ("交易ID", &truncate_address(trade_id)),
                     ("已收到", &format!("{} {}", token_amount, token_symbol)),
-                    ("結算交易", &format!("<a href=\"https://basescan.org/tx/{}\" style=\"color: #6366f1;\">{}</a>", settlement_tx, truncate_address(settlement_tx))),
+                    ("結算交易", &format!("<a href=\"{}/tx/{}\" style=\"color: #6366f1;\">{}</a>", explorer, settlement_tx, truncate_address(settlement_tx))),
                 ],
                 app_url,
                 "/account",

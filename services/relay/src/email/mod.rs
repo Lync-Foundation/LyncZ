@@ -104,6 +104,7 @@ pub enum EmailInfo {
         fee_amount: String,
         buyer_address: String,
         settlement_tx: String,
+        chain_id: u64,
     },
     /// Trade settled - email to buyer
     TradeSettledBuyer {
@@ -112,6 +113,7 @@ pub enum EmailInfo {
         token_amount: String,
         token_symbol: String,
         settlement_tx: String,
+        chain_id: u64,
     },
     /// Trade expired (seller)
     TradeExpiredSeller {

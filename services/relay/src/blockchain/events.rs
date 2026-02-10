@@ -720,6 +720,7 @@ impl EventListener {
                         fee_amount: formatted_fee,
                         buyer_address: trade.buyer.clone(),
                         settlement_tx: tx_hash.clone(),
+                        chain_id: self.chain_id as u64,
                     },
                 ).await;
                 
@@ -733,6 +734,7 @@ impl EventListener {
                         token_amount: formatted_token_amount,
                         token_symbol,
                         settlement_tx: tx_hash.clone(),
+                        chain_id: self.chain_id as u64,
                     },
                 ).await;
             }
@@ -880,24 +882,36 @@ impl EventListener {
 // TOKEN HELPERS
 // ================================================================
 
-/// Get token symbol from address (Base Mainnet)
+/// Get token symbol from address (Base + Ethereum Mainnet)
 fn get_token_symbol(token_address: &str) -> String {
     let addr = token_address.to_lowercase();
     match addr.as_str() {
+        // Base Mainnet
         "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" => "USDC".to_string(),
         "0x4200000000000000000000000000000000000006" => "WETH".to_string(),
         "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf" => "cbBTC".to_string(),
+        // Ethereum Mainnet
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" => "USDC".to_string(),
+        "0xdac17f958d2ee523a2206206994597c13d831ec7" => "USDT".to_string(),
+        "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" => "WETH".to_string(),
+        "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599" => "WBTC".to_string(),
         _ => "TOKEN".to_string(),
     }
 }
 
-/// Get token decimals from address (Base Mainnet)
+/// Get token decimals from address (Base + Ethereum Mainnet)
 fn get_token_decimals(token_address: &str) -> u8 {
     let addr = token_address.to_lowercase();
     match addr.as_str() {
+        // Base Mainnet
         "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" => 6,  // USDC
         "0x4200000000000000000000000000000000000006" => 18, // WETH
         "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf" => 8,  // cbBTC
+        // Ethereum Mainnet
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" => 6,  // USDC
+        "0xdac17f958d2ee523a2206206994597c13d831ec7" => 6,  // USDT
+        "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" => 18, // WETH
+        "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599" => 8,  // WBTC
         _ => 18,
     }
 }
