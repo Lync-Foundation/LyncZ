@@ -57,6 +57,10 @@ pub struct DbOrder {
     #[sqlx(rename = "createdAt")]
     pub created_at: i64,                    // uint256 (unix timestamp)
     
+    // Multi-chain support
+    #[sqlx(rename = "chainId")]
+    pub chain_id: i32,                      // Chain ID: 8453=Base, 1=Ethereum
+    
     // Additional fields for convenience (NOT on-chain)
     #[sqlx(rename = "syncedAt")]
     pub synced_at: DateTime<Utc>,           // When record was synced to DB
@@ -142,4 +146,34 @@ pub struct DbTrade {
     pub proof_json: Option<String>,          // Full Axiom EVM proof JSON
     #[sqlx(rename = "settlement_error")]
     pub settlement_error: Option<String>,    // Settlement error code if failed
+    
+    // Multi-chain support
+    #[sqlx(rename = "chainId")]
+    #[sqlx(default)]
+    pub chain_id: i32,                       // Chain ID: 8453=Base, 1=Ethereum
+}
+
+/// Database model for Gas Cost tracking - relay wallet gas expenditure per chain
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct DbGasCost {
+    pub id: i32,
+    #[sqlx(rename = "chainId")]
+    pub chain_id: i32,                       // Chain ID: 8453=Base, 1=Ethereum
+    pub operation: String,                   // Operation type: create_trade, settle, cancel
+    #[sqlx(rename = "tradeId")]
+    pub trade_id: Option<String>,            // Associated trade ID
+    #[sqlx(rename = "orderId")]
+    pub order_id: Option<String>,            // Associated order ID
+    #[sqlx(rename = "txHash")]
+    pub tx_hash: String,                     // Transaction hash
+    #[sqlx(rename = "gasUsed")]
+    pub gas_used: i64,                       // Gas units consumed
+    #[sqlx(rename = "gasPriceGwei")]
+    pub gas_price_gwei: String,              // Gas price in Gwei (NUMERIC as string)
+    #[sqlx(rename = "costWei")]
+    pub cost_wei: String,                    // Total cost in Wei
+    #[sqlx(rename = "costEth")]
+    pub cost_eth: String,                    // Total cost in ETH
+    #[sqlx(rename = "createdAt")]
+    pub created_at: DateTime<Utc>,           // When gas cost was recorded
 }

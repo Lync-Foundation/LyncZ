@@ -49,8 +49,8 @@ pub async fn health_check(State(state): State<AppState>) -> ApiResult<Json<Healt
 /// Debug database endpoint - returns all orders and trades for debugging purposes
 /// GET /api/debug/database
 pub async fn debug_database(State(state): State<AppState>) -> ApiResult<Json<serde_json::Value>> {
-    // Get all active orders (no limit)
-    let orders = state.db.get_active_orders(None).await?;
+    // Get all active orders (no limit, all chains)
+    let orders = state.db.get_active_orders(None, None).await?;
     
     // Get all trades
     let trades = state.db.get_all_trades().await.unwrap_or_default();

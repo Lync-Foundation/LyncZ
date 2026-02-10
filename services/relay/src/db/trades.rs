@@ -68,9 +68,9 @@ impl TradeRepository for PostgresTradeRepository {
                 "tradeId", "orderId", "buyer", "token", "tokenAmount", "cnyAmount", "feeAmount",
                 "rail", "transactionId", "paymentTime",
                 "createdAt", "expiresAt", "status",
-                "escrowTxHash", "settlementTxHash"
+                "escrowTxHash", "settlementTxHash", "chainId"
             )
-            VALUES ($1, $2, $3, $4, $5::numeric, $6::numeric, $7::numeric, $8, $9, $10, $11, $12, $13, $14, $15)
+            VALUES ($1, $2, $3, $4, $5::numeric, $6::numeric, $7::numeric, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             ON CONFLICT ("tradeId") DO NOTHING
             "#,
         )
@@ -89,6 +89,7 @@ impl TradeRepository for PostgresTradeRepository {
         .bind(trade.status)
         .bind(&trade.escrow_tx_hash)
         .bind(&trade.settlement_tx_hash)
+        .bind(trade.chain_id)
         .execute(&self.pool)
         .await?;
         
@@ -106,7 +107,8 @@ impl TradeRepository for PostgresTradeRepository {
                 "escrowTxHash", "settlementTxHash", "syncedAt",
                 pdf_file, pdf_filename, pdf_uploaded_at,
                 proof_user_public_values, proof_accumulator, proof_data,
-                axiom_proof_id, proof_generated_at, proof_json, settlement_error
+                axiom_proof_id, proof_generated_at, proof_json, settlement_error,
+                "chainId"
             FROM trades
             WHERE "tradeId" = $1
             "#,
@@ -144,6 +146,7 @@ impl TradeRepository for PostgresTradeRepository {
             proof_generated_at: row.get("proof_generated_at"),
             proof_json: row.get("proof_json"),
             settlement_error: row.get("settlement_error"),
+            chain_id: row.get("chainId"),
             alipay_id: None, // Not available in single trade query
             alipay_name: None, // Not available in single trade query
         })
@@ -300,7 +303,8 @@ impl TradeRepository for PostgresTradeRepository {
                 "escrowTxHash", "settlementTxHash", "syncedAt",
                 pdf_file, pdf_filename, pdf_uploaded_at,
                 proof_user_public_values, proof_accumulator, proof_data,
-                axiom_proof_id, proof_generated_at, proof_json, settlement_error
+                axiom_proof_id, proof_generated_at, proof_json, settlement_error,
+                "chainId"
             FROM trades
             WHERE status = 0 AND "expiresAt" < EXTRACT(EPOCH FROM NOW())::bigint
             ORDER BY "expiresAt" ASC
@@ -339,6 +343,7 @@ impl TradeRepository for PostgresTradeRepository {
                 proof_generated_at: row.get("proof_generated_at"),
                 proof_json: row.get("proof_json"),
                 settlement_error: row.get("settlement_error"),
+                chain_id: row.get("chainId"),
                 alipay_id: None, // Not needed for auto-cancellation
                 alipay_name: None, // Not needed for auto-cancellation
             });
@@ -357,6 +362,7 @@ impl TradeRepository for PostgresTradeRepository {
                 t.pdf_file, t.pdf_filename, t.pdf_uploaded_at,
                 t.proof_user_public_values, t.proof_accumulator, t.proof_data,
                 t.axiom_proof_id, t.proof_generated_at, t.proof_json, t.settlement_error,
+                t."chainId",
                 COALESCE(t.token, o.token) as token,
                 o."accountId" as "alipay_id",
                 o."accountName" as "alipay_name"
@@ -399,6 +405,7 @@ impl TradeRepository for PostgresTradeRepository {
                 proof_generated_at: row.get("proof_generated_at"),
                 proof_json: row.get("proof_json"),
                 settlement_error: row.get("settlement_error"),
+                chain_id: row.get("chainId"),
                 alipay_id: row.get("alipay_id"),
                 alipay_name: row.get("alipay_name"),
             });
@@ -441,30 +448,57 @@ impl TradeRepository for PostgresTradeRepository {
 }
 
 impl PostgresTradeRepository {
+    /// Helper to map a joined trade row to DbTrade (includes token, alipay_id, alipay_name from orders JOIN)
+    fn map_joined_row(row: sqlx::postgres::PgRow) -> DbTrade {
+        use sqlx::Row;
+        DbTrade {
+            trade_id: row.get("tradeId"),
+            order_id: row.get("orderId"),
+            buyer: row.get("buyer"),
+            token_amount: row.get("tokenAmount"),
+            cny_amount: row.get("cnyAmount"),
+            fee_amount: row.get("feeAmount"),
+            rail: row.get("rail"),
+            transaction_id: row.get("transactionId"),
+            payment_time: row.get("paymentTime"),
+            created_at: row.get("createdAt"),
+            expires_at: row.get("expiresAt"),
+            status: row.get("status"),
+            escrow_tx_hash: row.get("escrowTxHash"),
+            settlement_tx_hash: row.get("settlementTxHash"),
+            synced_at: row.get("syncedAt"),
+            token: row.get("token"),
+            pdf_file: row.get("pdf_file"),
+            pdf_filename: row.get("pdf_filename"),
+            pdf_uploaded_at: row.get("pdf_uploaded_at"),
+            proof_user_public_values: row.get("proof_user_public_values"),
+            proof_accumulator: row.get("proof_accumulator"),
+            proof_data: row.get("proof_data"),
+            axiom_proof_id: row.get("axiom_proof_id"),
+            proof_generated_at: row.get("proof_generated_at"),
+            proof_json: row.get("proof_json"),
+            settlement_error: row.get("settlement_error"),
+            chain_id: row.get("chainId"),
+            alipay_id: row.get("alipay_id"),
+            alipay_name: row.get("alipay_name"),
+        }
+    }
+    
     /// Get all settled trades for an order (status=1), sorted by creation time descending
     /// Used for order activity timeline
     pub async fn get_settled_by_order(&self, order_id: &str) -> DbResult<Vec<DbTrade>> {
         let rows = sqlx::query(
             r#"
             SELECT 
-                t."tradeId",
-                t."orderId",
-                t.buyer,
-                t."tokenAmount"::TEXT,
-                t."cnyAmount"::TEXT,
-                t."feeAmount"::TEXT,
-                t.rail,
-                t."transactionId",
-                t."paymentTime",
-                t."createdAt",
-                t."expiresAt",
-                t.status,
-                t."syncedAt",
-                t."escrowTxHash",
-                t."settlementTxHash",
+                t."tradeId", t."orderId", t.buyer,
+                t."tokenAmount"::TEXT, t."cnyAmount"::TEXT, t."feeAmount"::TEXT,
+                t.rail, t."transactionId", t."paymentTime",
+                t."createdAt", t."expiresAt", t.status,
+                t."syncedAt", t."escrowTxHash", t."settlementTxHash",
                 t.pdf_file, t.pdf_filename, t.pdf_uploaded_at,
                 t.proof_user_public_values, t.proof_accumulator, t.proof_data,
                 t.axiom_proof_id, t.proof_generated_at, t.proof_json, t.settlement_error,
+                t."chainId",
                 COALESCE(t.token, o.token) as token,
                 o."accountId" as "alipay_id",
                 o."accountName" as "alipay_name"
@@ -478,41 +512,7 @@ impl PostgresTradeRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        let mut trades = Vec::new();
-        for row in rows {
-            use sqlx::Row;
-            trades.push(DbTrade {
-                trade_id: row.get("tradeId"),
-                order_id: row.get("orderId"),
-                buyer: row.get("buyer"),
-                token_amount: row.get("tokenAmount"),
-                cny_amount: row.get("cnyAmount"),
-                fee_amount: row.get("feeAmount"),
-                rail: row.get("rail"),
-                transaction_id: row.get("transactionId"),
-                payment_time: row.get("paymentTime"),
-                created_at: row.get("createdAt"),
-                expires_at: row.get("expiresAt"),
-                status: row.get("status"),
-                escrow_tx_hash: row.get("escrowTxHash"),
-                settlement_tx_hash: row.get("settlementTxHash"),
-                synced_at: row.get("syncedAt"),
-                token: row.get("token"),
-                pdf_file: row.get("pdf_file"),
-                pdf_filename: row.get("pdf_filename"),
-                pdf_uploaded_at: row.get("pdf_uploaded_at"),
-                proof_user_public_values: row.get("proof_user_public_values"),
-                proof_accumulator: row.get("proof_accumulator"),
-                proof_data: row.get("proof_data"),
-                axiom_proof_id: row.get("axiom_proof_id"),
-                proof_generated_at: row.get("proof_generated_at"),
-                proof_json: row.get("proof_json"),
-                settlement_error: row.get("settlement_error"),
-                alipay_id: row.get("alipay_id"),
-                alipay_name: row.get("alipay_name"),
-            });
-        }
-        Ok(trades)
+        Ok(rows.into_iter().map(Self::map_joined_row).collect())
     }
     
     /// Get all trades for an order (all statuses), sorted by creation time descending
@@ -521,24 +521,15 @@ impl PostgresTradeRepository {
         let rows = sqlx::query(
             r#"
             SELECT 
-                t."tradeId",
-                t."orderId",
-                t.buyer,
-                t."tokenAmount"::TEXT,
-                t."cnyAmount"::TEXT,
-                t."feeAmount"::TEXT,
-                t.rail,
-                t."transactionId",
-                t."paymentTime",
-                t."createdAt",
-                t."expiresAt",
-                t.status,
-                t."syncedAt",
-                t."escrowTxHash",
-                t."settlementTxHash",
+                t."tradeId", t."orderId", t.buyer,
+                t."tokenAmount"::TEXT, t."cnyAmount"::TEXT, t."feeAmount"::TEXT,
+                t.rail, t."transactionId", t."paymentTime",
+                t."createdAt", t."expiresAt", t.status,
+                t."syncedAt", t."escrowTxHash", t."settlementTxHash",
                 t.pdf_file, t.pdf_filename, t.pdf_uploaded_at,
                 t.proof_user_public_values, t.proof_accumulator, t.proof_data,
                 t.axiom_proof_id, t.proof_generated_at, t.proof_json, t.settlement_error,
+                t."chainId",
                 COALESCE(t.token, o.token) as token,
                 o."accountId" as "alipay_id",
                 o."accountName" as "alipay_name"
@@ -552,40 +543,6 @@ impl PostgresTradeRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        let mut trades = Vec::new();
-        for row in rows {
-            use sqlx::Row;
-            trades.push(DbTrade {
-                trade_id: row.get("tradeId"),
-                order_id: row.get("orderId"),
-                buyer: row.get("buyer"),
-                token_amount: row.get("tokenAmount"),
-                cny_amount: row.get("cnyAmount"),
-                fee_amount: row.get("feeAmount"),
-                rail: row.get("rail"),
-                transaction_id: row.get("transactionId"),
-                payment_time: row.get("paymentTime"),
-                created_at: row.get("createdAt"),
-                expires_at: row.get("expiresAt"),
-                status: row.get("status"),
-                escrow_tx_hash: row.get("escrowTxHash"),
-                settlement_tx_hash: row.get("settlementTxHash"),
-                synced_at: row.get("syncedAt"),
-                token: row.get("token"),
-                pdf_file: row.get("pdf_file"),
-                pdf_filename: row.get("pdf_filename"),
-                pdf_uploaded_at: row.get("pdf_uploaded_at"),
-                proof_user_public_values: row.get("proof_user_public_values"),
-                proof_accumulator: row.get("proof_accumulator"),
-                proof_data: row.get("proof_data"),
-                axiom_proof_id: row.get("axiom_proof_id"),
-                proof_generated_at: row.get("proof_generated_at"),
-                proof_json: row.get("proof_json"),
-                settlement_error: row.get("settlement_error"),
-                alipay_id: row.get("alipay_id"),
-                alipay_name: row.get("alipay_name"),
-            });
-        }
-        Ok(trades)
+        Ok(rows.into_iter().map(Self::map_joined_row).collect())
     }
 }

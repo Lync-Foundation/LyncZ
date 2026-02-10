@@ -42,6 +42,7 @@ pub struct EventListener {
     contract_address: Address,
     db_pool: sqlx::PgPool,
     start_block: u64,
+    chain_id: i32,
     email_service: Option<Arc<EmailService>>,
 }
 
@@ -52,6 +53,7 @@ impl EventListener {
         contract_address: Address,
         db_pool: sqlx::PgPool,
         start_block: Option<u64>,
+        chain_id: u64,
     ) -> Result<Self, EventListenerError> {
         let provider = Provider::<Http>::try_from(rpc_url)
             .map_err(|e| EventListenerError::ProviderError(e.to_string()))?;
@@ -94,6 +96,7 @@ impl EventListener {
             contract_address,
             db_pool,
             start_block,
+            chain_id: chain_id as i32,
             email_service,
         })
     }
@@ -276,6 +279,7 @@ impl EventListener {
             alipay_id: String::new(),                  // Empty - seller submits via API
             alipay_name: String::new(),                // Empty - seller submits via API
             created_at: chrono::Utc::now().timestamp(),
+            chain_id: self.chain_id,                   // Chain this event listener is monitoring
             synced_at: chrono::Utc::now(),
             is_public: event.is_public,                // From on-chain event
             private_code: None,                        // Generated when seller sets visibility
@@ -593,6 +597,7 @@ impl EventListener {
             proof_generated_at: None,
             proof_json: None,
             settlement_error: None, // Set when blockchain submission fails
+            chain_id: self.chain_id, // Chain this event listener is monitoring
             alipay_id: None, // Will be fetched from order when needed
             alipay_name: None, // Will be fetched from order when needed
         };

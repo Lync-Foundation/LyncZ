@@ -1,4 +1,5 @@
 pub mod account_emails;
+pub mod gas_costs;
 pub mod models;
 pub mod orders;
 pub mod trades;
@@ -81,15 +82,16 @@ impl Database {
     }
     
     /// Get all active orders (convenience method for API)
-    pub async fn get_active_orders(&self, limit: Option<i64>) -> DbResult<Vec<models::DbOrder>> {
+    /// chain_id: None = all chains, Some(8453) = Base only, Some(1) = ETH only
+    pub async fn get_active_orders(&self, limit: Option<i64>, chain_id: Option<i32>) -> DbResult<Vec<models::DbOrder>> {
         let repo = orders::PostgresOrderRepository::new(self.pool.clone());
-        repo.get_active_orders(limit).await
+        repo.get_active_orders(limit, chain_id).await
     }
     
     /// Get active orders filtered by token (convenience method for API)
-    pub async fn get_active_orders_by_token(&self, token_address: &str, limit: Option<i64>) -> DbResult<Vec<models::DbOrder>> {
+    pub async fn get_active_orders_by_token(&self, token_address: &str, limit: Option<i64>, chain_id: Option<i32>) -> DbResult<Vec<models::DbOrder>> {
         let repo = orders::PostgresOrderRepository::new(self.pool.clone());
-        repo.get_active_orders_by_token(token_address, limit).await
+        repo.get_active_orders_by_token(token_address, limit, chain_id).await
     }
     
     /// Get single order by ID (convenience method for API)
@@ -212,6 +214,20 @@ impl Database {
     pub async fn get_account_email_if_enabled(&self, wallet: &str) -> DbResult<Option<models::DbAccountEmail>> {
         let repo = account_emails::AccountEmailRepository::new(self.pool.clone());
         repo.get_if_enabled(wallet).await
+    }
+    
+    // ===== Gas Cost Methods (relay gas tracking) =====
+    
+    /// Record a gas cost for a relay transaction
+    pub async fn record_gas_cost(&self, gas_cost: &models::DbGasCost) -> DbResult<()> {
+        let repo = gas_costs::GasCostRepository::new(self.pool.clone());
+        repo.create(gas_cost).await
+    }
+    
+    /// Get gas cost summary by chain and operation
+    pub async fn get_gas_cost_summary(&self, chain_id: i32) -> DbResult<Vec<gas_costs::GasCostSummary>> {
+        let repo = gas_costs::GasCostRepository::new(self.pool.clone());
+        repo.get_summary_by_chain(chain_id).await
     }
     
     // ===== Withdrawal Methods (order activity timeline) =====

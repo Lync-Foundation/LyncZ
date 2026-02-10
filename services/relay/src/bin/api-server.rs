@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let rpc_url = config.rpc_url.clone();
                 let db_pool = state.db.pool().clone();
                 
-                if let Ok(mut listener) = EventListener::new(&rpc_url, escrow_address, db_pool, None).await {
+                if let Ok(mut listener) = EventListener::new(&rpc_url, escrow_address, db_pool, None, config.chain_id).await {
                     tokio::spawn(async move {
                         tracing::info!("🎧 Event listener started");
                         if let Err(e) = listener.start().await {

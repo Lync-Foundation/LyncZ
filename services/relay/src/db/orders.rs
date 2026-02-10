@@ -31,37 +31,47 @@ impl PostgresOrderRepository {
     
     /// Get all active PUBLIC orders (remainingAmount > 0, is_public = true) sorted by exchange rate
     /// Used by API for matching and order list queries
-    pub async fn get_active_orders(&self, limit: Option<i64>) -> DbResult<Vec<DbOrder>> {
+    /// Optionally filtered by chain_id (None = all chains)
+    pub async fn get_active_orders(&self, limit: Option<i64>, chain_id: Option<i32>) -> DbResult<Vec<DbOrder>> {
         let limit = limit.unwrap_or(100);
         
-        // Use runtime query validation (no compile-time verification)
-        let rows = sqlx::query(
-            r#"
-            SELECT 
-                "orderId",
-                seller,
-                token,
-                "totalAmount"::TEXT,
-                "remainingAmount"::TEXT,
-                "exchangeRate"::TEXT,
-                rail,
-                "accountId",
-                "accountName",
-                "createdAt",
-                "syncedAt",
-                "isPublic",
-                "privateCode"
-            FROM orders
-            WHERE "remainingAmount" > 0 AND "isPublic" = true
-            ORDER BY CAST("exchangeRate" AS NUMERIC) ASC, "createdAt" ASC
-            LIMIT $1
-            "#
-        )
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await?;
+        let rows = if let Some(cid) = chain_id {
+            sqlx::query(
+                r#"
+                SELECT 
+                    "orderId", seller, token,
+                    "totalAmount"::TEXT, "remainingAmount"::TEXT, "exchangeRate"::TEXT,
+                    rail, "accountId", "accountName", "createdAt", "syncedAt",
+                    "isPublic", "privateCode", "chainId"
+                FROM orders
+                WHERE "remainingAmount" > 0 AND "isPublic" = true AND "chainId" = $1
+                ORDER BY CAST("exchangeRate" AS NUMERIC) ASC, "createdAt" ASC
+                LIMIT $2
+                "#
+            )
+            .bind(cid)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query(
+                r#"
+                SELECT 
+                    "orderId", seller, token,
+                    "totalAmount"::TEXT, "remainingAmount"::TEXT, "exchangeRate"::TEXT,
+                    rail, "accountId", "accountName", "createdAt", "syncedAt",
+                    "isPublic", "privateCode", "chainId"
+                FROM orders
+                WHERE "remainingAmount" > 0 AND "isPublic" = true
+                ORDER BY CAST("exchangeRate" AS NUMERIC) ASC, "createdAt" ASC
+                LIMIT $1
+                "#
+            )
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?
+        };
         
-        // Manually map to DbOrder structs
         let orders: Vec<DbOrder> = rows
             .into_iter()
             .map(|row| Self::map_row_to_order(row))
@@ -84,6 +94,7 @@ impl PostgresOrderRepository {
             alipay_id: row.get("accountId"),
             alipay_name: row.get("accountName"),
             created_at: row.get("createdAt"),
+            chain_id: row.get("chainId"),
             synced_at: row.get("syncedAt"),
             is_public: row.get("isPublic"),
             private_code: row.get("privateCode"),
@@ -92,40 +103,52 @@ impl PostgresOrderRepository {
     
     /// Get active PUBLIC orders filtered by token address (case-insensitive)
     /// Used by API for token-specific matching
-    pub async fn get_active_orders_by_token(&self, token_address: &str, limit: Option<i64>) -> DbResult<Vec<DbOrder>> {
+    /// Optionally filtered by chain_id
+    pub async fn get_active_orders_by_token(&self, token_address: &str, limit: Option<i64>, chain_id: Option<i32>) -> DbResult<Vec<DbOrder>> {
         let limit = limit.unwrap_or(100);
         let token_lower = token_address.to_lowercase();
         
-        // Use runtime query validation (no compile-time verification)
-        let rows = sqlx::query(
-            r#"
-            SELECT 
-                "orderId",
-                seller,
-                token,
-                "totalAmount"::TEXT,
-                "remainingAmount"::TEXT,
-                "exchangeRate"::TEXT,
-                rail,
-                "accountId",
-                "accountName",
-                "createdAt",
-                "syncedAt",
-                "isPublic",
-                "privateCode"
-            FROM orders
-            WHERE "remainingAmount" > 0 AND "isPublic" = true
-            AND LOWER(token) = $1
-            ORDER BY CAST("exchangeRate" AS NUMERIC) ASC, "createdAt" ASC
-            LIMIT $2
-            "#
-        )
-        .bind(&token_lower)
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await?;
+        let rows = if let Some(cid) = chain_id {
+            sqlx::query(
+                r#"
+                SELECT 
+                    "orderId", seller, token,
+                    "totalAmount"::TEXT, "remainingAmount"::TEXT, "exchangeRate"::TEXT,
+                    rail, "accountId", "accountName", "createdAt", "syncedAt",
+                    "isPublic", "privateCode", "chainId"
+                FROM orders
+                WHERE "remainingAmount" > 0 AND "isPublic" = true
+                AND LOWER(token) = $1 AND "chainId" = $2
+                ORDER BY CAST("exchangeRate" AS NUMERIC) ASC, "createdAt" ASC
+                LIMIT $3
+                "#
+            )
+            .bind(&token_lower)
+            .bind(cid)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query(
+                r#"
+                SELECT 
+                    "orderId", seller, token,
+                    "totalAmount"::TEXT, "remainingAmount"::TEXT, "exchangeRate"::TEXT,
+                    rail, "accountId", "accountName", "createdAt", "syncedAt",
+                    "isPublic", "privateCode", "chainId"
+                FROM orders
+                WHERE "remainingAmount" > 0 AND "isPublic" = true
+                AND LOWER(token) = $1
+                ORDER BY CAST("exchangeRate" AS NUMERIC) ASC, "createdAt" ASC
+                LIMIT $2
+                "#
+            )
+            .bind(&token_lower)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await?
+        };
         
-        // Manually map to DbOrder structs
         let orders: Vec<DbOrder> = rows
             .into_iter()
             .map(|row| Self::map_row_to_order(row))
@@ -139,19 +162,10 @@ impl PostgresOrderRepository {
         let row = sqlx::query(
             r#"
             SELECT 
-                "orderId",
-                seller,
-                token,
-                "totalAmount"::TEXT,
-                "remainingAmount"::TEXT,
-                "exchangeRate"::TEXT,
-                rail,
-                "accountId",
-                "accountName",
-                "createdAt",
-                "syncedAt",
-                "isPublic",
-                "privateCode"
+                "orderId", seller, token,
+                "totalAmount"::TEXT, "remainingAmount"::TEXT, "exchangeRate"::TEXT,
+                rail, "accountId", "accountName", "createdAt", "syncedAt",
+                "isPublic", "privateCode", "chainId"
             FROM orders
             WHERE "orderId" = $1
             "#,
@@ -169,19 +183,10 @@ impl PostgresOrderRepository {
         let row = sqlx::query(
             r#"
             SELECT 
-                "orderId",
-                seller,
-                token,
-                "totalAmount"::TEXT,
-                "remainingAmount"::TEXT,
-                "exchangeRate"::TEXT,
-                rail,
-                "accountId",
-                "accountName",
-                "createdAt",
-                "syncedAt",
-                "isPublic",
-                "privateCode"
+                "orderId", seller, token,
+                "totalAmount"::TEXT, "remainingAmount"::TEXT, "exchangeRate"::TEXT,
+                rail, "accountId", "accountName", "createdAt", "syncedAt",
+                "isPublic", "privateCode", "chainId"
             FROM orders
             WHERE "privateCode" = $1
             "#,
@@ -297,9 +302,9 @@ impl PostgresOrderRepository {
                 r#"
                 INSERT INTO orders (
                     "orderId", "seller", "token", "totalAmount", "remainingAmount",
-                    "exchangeRate", "rail", "accountId", "accountName", "createdAt", "isPublic"
+                    "exchangeRate", "rail", "accountId", "accountName", "createdAt", "isPublic", "chainId"
                 )
-                VALUES ($1, '', '', 0, 0, 0, 0, $2, $3, 0, true)
+                VALUES ($1, '', '', 0, 0, 0, 0, $2, $3, 0, true, 8453)
                 ON CONFLICT ("orderId") DO UPDATE SET
                     "accountId" = EXCLUDED."accountId",
                     "accountName" = EXCLUDED."accountName"
@@ -320,19 +325,10 @@ impl PostgresOrderRepository {
         let rows = sqlx::query(
             r#"
             SELECT 
-                "orderId",
-                seller,
-                token,
-                "totalAmount"::TEXT,
-                "remainingAmount"::TEXT,
-                "exchangeRate"::TEXT,
-                rail,
-                "accountId",
-                "accountName",
-                "createdAt",
-                "syncedAt",
-                "isPublic",
-                "privateCode"
+                "orderId", seller, token,
+                "totalAmount"::TEXT, "remainingAmount"::TEXT, "exchangeRate"::TEXT,
+                rail, "accountId", "accountName", "createdAt", "syncedAt",
+                "isPublic", "privateCode", "chainId"
             FROM orders
             WHERE seller = $1
             ORDER BY "createdAt" DESC
@@ -361,9 +357,9 @@ impl OrderRepository for PostgresOrderRepository {
             r#"
             INSERT INTO orders (
                 "orderId", "seller", "token", "totalAmount", "remainingAmount",
-                "exchangeRate", "rail", "accountId", "accountName", "createdAt", "isPublic"
+                "exchangeRate", "rail", "accountId", "accountName", "createdAt", "isPublic", "chainId"
             )
-            VALUES ($1, $2, $3, $4::numeric, $5::numeric, $6::numeric, $7, $8, $9, $10, $11)
+            VALUES ($1, $2, $3, $4::numeric, $5::numeric, $6::numeric, $7, $8, $9, $10, $11, $12)
             ON CONFLICT ("orderId") DO UPDATE SET
                 -- Update blockchain-authoritative fields
                 "seller" = EXCLUDED."seller",
@@ -374,6 +370,7 @@ impl OrderRepository for PostgresOrderRepository {
                 "rail" = EXCLUDED."rail",
                 "createdAt" = EXCLUDED."createdAt",
                 "isPublic" = EXCLUDED."isPublic",
+                "chainId" = EXCLUDED."chainId",
                 -- PRESERVE existing accountId/accountName if already set (race condition handling)
                 "accountId" = CASE 
                     WHEN orders."accountId" IS NOT NULL AND orders."accountId" != '' 
@@ -398,6 +395,7 @@ impl OrderRepository for PostgresOrderRepository {
         .bind(&order.alipay_name)
         .bind(order.created_at)
         .bind(order.is_public)
+        .bind(order.chain_id)
         .execute(&self.pool)
         .await?;
         

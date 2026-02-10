@@ -22,24 +22,36 @@ use crate::email::format_token_amount;
 // TOKEN HELPERS
 // ================================================================
 
-/// Get token symbol from address (Base Mainnet)
+/// Get token symbol from address (Base Mainnet + Ethereum Mainnet)
 fn get_token_symbol(token_address: &str) -> String {
     let addr = token_address.to_lowercase();
     match addr.as_str() {
+        // Base Mainnet
         "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" => "USDC".to_string(),
         "0x4200000000000000000000000000000000000006" => "WETH".to_string(),
         "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf" => "cbBTC".to_string(),
+        // Ethereum Mainnet
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" => "USDC".to_string(),  // ETH USDC
+        "0xdac17f958d2ee523a2206206994597c13d831ec7" => "USDT".to_string(),  // ETH USDT
+        "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" => "WETH".to_string(),  // ETH WETH
+        "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599" => "WBTC".to_string(),  // ETH WBTC
         _ => "TOKEN".to_string(),
     }
 }
 
-/// Get token decimals from address (Base Mainnet)
+/// Get token decimals from address (Base Mainnet + Ethereum Mainnet)
 fn get_token_decimals(token_address: &str) -> u8 {
     let addr = token_address.to_lowercase();
     match addr.as_str() {
+        // Base Mainnet
         "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" => 6,  // USDC
         "0x4200000000000000000000000000000000000006" => 18, // WETH
         "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf" => 8,  // cbBTC
+        // Ethereum Mainnet
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" => 6,  // USDC
+        "0xdac17f958d2ee523a2206206994597c13d831ec7" => 6,  // USDT
+        "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" => 18, // WETH
+        "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599" => 8,  // WBTC
         _ => 18,
     }
 }
@@ -55,6 +67,10 @@ pub struct OrderQueryParams {
     
     /// Filter by token address (optional)
     pub token: Option<String>,
+    
+    /// Filter by chain ID (optional, None = all chains)
+    /// 8453 = Base, 1 = Ethereum
+    pub chain_id: Option<i32>,
 }
 
 /// Order response DTO
@@ -70,6 +86,7 @@ pub struct OrderDto {
     pub alipay_id: String,
     pub alipay_name: String,
     pub created_at: i64,
+    pub chain_id: i32,  // Chain ID: 8453=Base, 1=Ethereum
     pub is_public: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub private_code: Option<String>,
@@ -110,11 +127,11 @@ pub async fn get_active_orders(
         // Get orders by seller (includes private orders — safe because we verified ownership)
         state.db.get_orders_by_seller(&seller).await?
     } else if let Some(token) = params.token {
-        // Get orders by token
-        state.db.get_active_orders_by_token(&token, params.limit).await?
+        // Get orders by token (optionally filtered by chain)
+        state.db.get_active_orders_by_token(&token, params.limit, params.chain_id).await?
     } else {
-        // Get all active orders
-        state.db.get_active_orders(params.limit).await?
+        // Get all active orders (optionally filtered by chain)
+        state.db.get_active_orders(params.limit, params.chain_id).await?
     };
     
     let order_dtos: Vec<OrderDto> = orders
@@ -223,6 +240,7 @@ fn order_to_dto(o: crate::db::models::DbOrder) -> OrderDto {
         alipay_id: o.alipay_id,
         alipay_name: o.alipay_name,
         created_at: o.created_at,
+        chain_id: o.chain_id,
         is_public: o.is_public,
         private_code: o.private_code,
     }
@@ -419,20 +437,21 @@ pub async fn get_order_activities(
     }))
 }
 
-/// Get token symbol and decimals from address (Base Mainnet)
+/// Get token symbol and decimals from address (Base Mainnet + Ethereum Mainnet)
 fn get_token_info(token_address: &str) -> (String, u8) {
     let addr = token_address.to_lowercase();
     match addr.as_str() {
-        // USDC - 6 decimals
+        // Base Mainnet
         "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" => ("USDC".to_string(), 6),
-        // USDbC (bridged) - 6 decimals
         "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca" => ("USDbC".to_string(), 6),
-        // DAI - 18 decimals
         "0x50c5725949a6f0c72e6c4a641f24049a917db0cb" => ("DAI".to_string(), 18),
-        // WETH - 18 decimals
         "0x4200000000000000000000000000000000000006" => ("WETH".to_string(), 18),
-        // cbBTC (Coinbase Wrapped BTC) - 8 decimals
         "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf" => ("cbBTC".to_string(), 8),
+        // Ethereum Mainnet
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" => ("USDC".to_string(), 6),
+        "0xdac17f958d2ee523a2206206994597c13d831ec7" => ("USDT".to_string(), 6),
+        "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" => ("WETH".to_string(), 18),
+        "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599" => ("WBTC".to_string(), 8),
         // Default: assume 18 decimals (ERC20 standard)
         _ => ("TOKEN".to_string(), 18),
     }
