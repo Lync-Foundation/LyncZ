@@ -39,9 +39,9 @@ pub struct EthereumClient {
 const BASE_L2_GAS_PRICE_WEI: u64 = 30_000_000; // 0.03 gwei
 //
 // Ethereum L1: Currently ~0.065 gwei (Jan 2026), can spike during congestion
-// Cap at 0.5 gwei - generous headroom above current 0.065 gwei base fee
+// Cap at 0.1 gwei - moderate headroom above current 0.065 gwei base fee
 // If gas exceeds this cap, transactions will wait until fees drop
-const ETH_L1_GAS_PRICE_WEI: u64 = 500_000_000; // 0.5 gwei
+const ETH_L1_GAS_PRICE_WEI: u64 = 100_000_000; // 0.1 gwei
 
 impl EthereumClient {
     pub async fn new(

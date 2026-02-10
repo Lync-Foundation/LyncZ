@@ -46,7 +46,7 @@ pub async fn health_check(State(state): State<AppState>) -> ApiResult<Json<Healt
     }))
 }
 
-/// Debug database endpoint - returns all orders and trades for debugging purposes
+/// Debug database endpoint - returns all orders and trades with chain info
 /// GET /api/debug/database
 pub async fn debug_database(State(state): State<AppState>) -> ApiResult<Json<serde_json::Value>> {
     // Get all active orders (no limit, all chains)
@@ -55,30 +55,128 @@ pub async fn debug_database(State(state): State<AppState>) -> ApiResult<Json<ser
     // Get all trades
     let trades = state.db.get_all_trades().await.unwrap_or_default();
     
+    // Build per-chain summary
+    let mut base_orders = 0u32;
+    let mut eth_orders = 0u32;
+    for order in &orders {
+        match order.chain_id {
+            8453 => base_orders += 1,
+            1 => eth_orders += 1,
+            _ => {}
+        }
+    }
+    
+    let mut base_trades = 0u32;
+    let mut eth_trades = 0u32;
+    let mut base_pending = 0u32;
+    let mut eth_pending = 0u32;
+    let mut base_settled = 0u32;
+    let mut eth_settled = 0u32;
+    for trade in &trades {
+        match trade.chain_id {
+            8453 => {
+                base_trades += 1;
+                match trade.status { 0 => base_pending += 1, 1 => base_settled += 1, _ => {} }
+            }
+            1 => {
+                eth_trades += 1;
+                match trade.status { 0 => eth_pending += 1, 1 => eth_settled += 1, _ => {} }
+            }
+            _ => {}
+        }
+    }
+    
+    // Get chain configs
+    let mut chain_configs = serde_json::Map::new();
+    for (&chain_id, _) in state.blockchain_clients.iter() {
+        let chain_name = match chain_id { 8453 => "Base", 1 => "Ethereum", _ => "Unknown" };
+        if let Ok(config) = state.get_config_for_chain(chain_id, false).await {
+            chain_configs.insert(chain_name.to_string(), serde_json::json!({
+                "chain_id": chain_id,
+                "config": config,
+            }));
+        } else {
+            chain_configs.insert(chain_name.to_string(), serde_json::json!({
+                "chain_id": chain_id,
+                "config": "failed to fetch",
+            }));
+        }
+    }
+    
+    // Get gas cost summaries
+    let gas_summary_base = state.db.get_gas_cost_summary(8453).await.ok();
+    let gas_summary_eth = state.db.get_gas_cost_summary(1).await.ok();
+    
     Ok(Json(serde_json::json!({
+        "summary": {
+            "base": {
+                "chain_id": 8453,
+                "orders": base_orders,
+                "trades": base_trades,
+                "trades_pending": base_pending,
+                "trades_settled": base_settled,
+                "gas_costs": gas_summary_base,
+            },
+            "ethereum": {
+                "chain_id": 1,
+                "orders": eth_orders,
+                "trades": eth_trades,
+                "trades_pending": eth_pending,
+                "trades_settled": eth_settled,
+                "gas_costs": gas_summary_eth,
+            },
+        },
+        "chain_configs": chain_configs,
         "orders": orders,
-        "trades": trades
+        "trades": trades,
     })))
 }
 
 // ============ Admin Endpoints ============
 
-/// GET /api/admin/config - Get contract configuration (cached, 15 min TTL)
+/// GET /api/admin/config - Get contract configuration for all chains (cached, 15 min TTL)
 /// Query params:
 ///   - refresh=true: Force refresh from blockchain (bypasses cache)
+///   - chain_id=8453: Get config for specific chain only (optional)
 pub async fn get_contract_config(
     State(state): State<AppState>,
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let force_refresh = params.get("refresh").map(|v| v == "true").unwrap_or(false);
-    let chain_id: u64 = params.get("chain_id")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(8453);
     
-    let config = state.get_config_for_chain(chain_id, force_refresh).await
-        .map_err(|e| ApiError::BlockchainError(e))?;
+    // If specific chain_id requested, return just that chain's config
+    if let Some(chain_id_str) = params.get("chain_id") {
+        if let Ok(chain_id) = chain_id_str.parse::<u64>() {
+            let config = state.get_config_for_chain(chain_id, force_refresh).await
+                .map_err(|e| ApiError::BlockchainError(e))?;
+            return Ok(Json(serde_json::json!({
+                "chain_id": chain_id,
+                "config": config,
+            })));
+        }
+    }
     
-    Ok(Json(serde_json::json!(config)))
+    // Otherwise return configs for ALL chains
+    let mut configs = serde_json::Map::new();
+    for (&chain_id, _) in state.blockchain_clients.iter() {
+        let chain_name = match chain_id { 8453 => "Base", 1 => "Ethereum", _ => "Unknown" };
+        match state.get_config_for_chain(chain_id, force_refresh).await {
+            Ok(config) => {
+                configs.insert(chain_name.to_string(), serde_json::json!({
+                    "chain_id": chain_id,
+                    "config": config,
+                }));
+            }
+            Err(e) => {
+                configs.insert(chain_name.to_string(), serde_json::json!({
+                    "chain_id": chain_id,
+                    "error": e,
+                }));
+            }
+        }
+    }
+    
+    Ok(Json(serde_json::json!(configs)))
 }
 
 // ============ Admin Write Endpoints REMOVED for Security ============
