@@ -9,7 +9,7 @@
 //! 6. Backend middleware extracts and validates the JWT on protected endpoints
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use axum::{
@@ -26,18 +26,22 @@ use crate::api::state::AppState;
 // JWT Configuration
 // ============================================================================
 
-/// JWT secret - in production, use a proper secret from env
-fn jwt_secret() -> String {
-    std::env::var("JWT_SECRET").unwrap_or_else(|_| {
-        // Generate a random secret if not set (development only)
-        tracing::warn!("JWT_SECRET not set, using random secret (sessions won't persist across restarts)");
-        use rand::Rng;
-        let secret: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(64)
-            .map(char::from)
-            .collect();
-        secret
+/// Cached JWT secret - generated once and reused for the lifetime of the process
+static JWT_SECRET: OnceLock<String> = OnceLock::new();
+
+/// Get the JWT secret (cached after first call)
+fn jwt_secret() -> &'static str {
+    JWT_SECRET.get_or_init(|| {
+        std::env::var("JWT_SECRET").unwrap_or_else(|_| {
+            tracing::warn!("JWT_SECRET not set, generating random secret (tokens won't survive restarts)");
+            use rand::Rng;
+            let secret: String = rand::thread_rng()
+                .sample_iter(&rand::distributions::Alphanumeric)
+                .take(64)
+                .map(char::from)
+                .collect();
+            secret
+        })
     })
 }
 
