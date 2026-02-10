@@ -2,11 +2,12 @@
 
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { useAccount, useSwitchChain, useDisconnect } from 'wagmi';
-import { base } from 'wagmi/chains';
+import { base, mainnet } from 'wagmi/chains';
 import { Button } from '@/components/ui/button';
 import { Wallet, AlertTriangle, Loader2, LogOut, ChevronDown, RefreshCw, Plus } from 'lucide-react';
 import { useLocale } from '@/components/LocaleProvider';
 import { useState, useRef, useEffect } from 'react';
+import { SUPPORTED_CHAIN_IDS } from '@/lib/wagmi';
 
 const LAST_WALLET_KEY = 'lyncz_last_wallet';
 
@@ -60,7 +61,7 @@ export function WalletButton() {
   const choiceRef = useRef<HTMLDivElement>(null);
   
   const t = translations[locale as keyof typeof translations] || translations.en;
-  const isWrongNetwork = isConnected && chainId !== base.id;
+  const isWrongNetwork = isConnected && chainId !== undefined && !(SUPPORTED_CHAIN_IDS as readonly number[]).includes(chainId);
   
   // Load last used wallet from localStorage
   useEffect(() => {
@@ -211,7 +212,7 @@ export function WalletButton() {
     );
   }
 
-  // If on wrong network, show switch button
+  // If on wrong network (unsupported chain), show switch button
   if (isWrongNetwork) {
     return (
       <Button
@@ -224,7 +225,7 @@ export function WalletButton() {
         ) : (
           <AlertTriangle className="mr-2 h-4 w-4" />
         )}
-        {t.switchToBase}
+        {t.wrongNetwork}
       </Button>
     );
   }
@@ -341,7 +342,7 @@ export function ConnectWalletButton({ className = '' }: { className?: string }) 
   );
 }
 
-// Network badge component
+// Network badge component - supports multiple chains
 export function NetworkBadge({ className = '' }: { className?: string }) {
   const { isConnected: wagmiConnected, chainId } = useAccount();
   const { switchChain, isPending } = useSwitchChain();
@@ -352,13 +353,21 @@ export function NetworkBadge({ className = '' }: { className?: string }) {
   
   if (!isConnected) return null;
   
-  const isCorrectNetwork = chainId === base.id;
+  const isSupportedNetwork = chainId !== undefined && (SUPPORTED_CHAIN_IDS as readonly number[]).includes(chainId);
   
-  if (isCorrectNetwork) {
+  if (isSupportedNetwork) {
+    // Show current chain name with appropriate color
+    const isBase = chainId === base.id;
+    const chainName = isBase ? 'Base' : 'Ethereum';
+    const colorClasses = isBase 
+      ? 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20'
+      : 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20';
+    const dotColor = isBase ? 'bg-blue-500' : 'bg-purple-500';
+    
     return (
-      <div className={`flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-full text-sm font-medium border border-emerald-500/20 ${className}`}>
-        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-        Base Network
+      <div className={`flex items-center gap-2 px-3 py-1.5 ${colorClasses} rounded-full text-sm font-medium border ${className}`}>
+        <span className={`w-2 h-2 ${dotColor} rounded-full animate-pulse`}></span>
+        {chainName}
       </div>
     );
   }
@@ -374,7 +383,7 @@ export function NetworkBadge({ className = '' }: { className?: string }) {
       ) : (
         <AlertTriangle className="w-3 h-3" />
       )}
-      Switch to Base
+      Switch Network
     </button>
   );
 }

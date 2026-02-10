@@ -1,16 +1,15 @@
 'use client';
 
 import { useAccount, useSwitchChain } from 'wagmi';
-import { base } from 'wagmi/chains';
 import { useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
-
-export const TARGET_CHAIN_ID = base.id; // 8453
+import { SUPPORTED_CHAIN_IDS } from '@/lib/wagmi';
 
 /**
  * Hook to guard against wrong chain connections.
  * Returns chain state and helpers for UI components.
  * 
+ * Supports multiple chains (Base + Ethereum Mainnet).
  * Checks BOTH wagmi's connection state AND Privy's authentication state
  * to ensure proper disconnect behavior.
  */
@@ -22,12 +21,15 @@ export function useChainGuard() {
   // User is truly connected only if both wagmi AND Privy say so
   const isConnected = wagmiConnected && authenticated && ready;
   
-  const isCorrectChain = isConnected && chainId === TARGET_CHAIN_ID;
-  const isWrongChain = isConnected && chainId !== undefined && chainId !== TARGET_CHAIN_ID;
-  const canInteract = isConnected && isCorrectChain;
+  // Check if connected to any supported chain
+  const isSupportedChain = isConnected && chainId !== undefined && 
+    (SUPPORTED_CHAIN_IDS as readonly number[]).includes(chainId);
+  const isCorrectChain = isSupportedChain; // Any supported chain is "correct"
+  const isWrongChain = isConnected && chainId !== undefined && !isSupportedChain;
+  const canInteract = isConnected && isSupportedChain;
   
   // Get chain name
-  const getChainName = (id: number | undefined) => {
+  const getChainNameById = (id: number | undefined) => {
     const names: Record<number, string> = {
       1: 'Ethereum',
       5: 'Goerli',
@@ -42,14 +44,19 @@ export function useChainGuard() {
     return id ? names[id] || `Chain ${id}` : 'Unknown';
   };
   
-  const currentChainName = getChainName(chainId);
-  const targetChainName = getChainName(TARGET_CHAIN_ID);
+  const currentChainName = getChainNameById(chainId);
   
-  const switchToBase = useCallback(() => {
+  // Switch to a specific chain
+  const switchToChain = useCallback((targetChainId: number) => {
     if (switchChain) {
-      switchChain({ chainId: TARGET_CHAIN_ID });
+      switchChain({ chainId: targetChainId });
     }
   }, [switchChain]);
+  
+  // Legacy: switch to Base (for components that don't need chain selection)
+  const switchToBase = useCallback(() => {
+    switchToChain(8453);
+  }, [switchToChain]);
   
   return {
     address,
@@ -57,9 +64,10 @@ export function useChainGuard() {
     chainId,
     isCorrectChain,
     isWrongChain,
+    isSupportedChain,
     canInteract,
     currentChainName,
-    targetChainName,
+    switchToChain,
     switchToBase,
     isSwitching,
   };

@@ -23,6 +23,8 @@ export interface Order {
   // Private listing fields
   is_public: boolean;
   private_code?: string;
+  // Multi-chain support
+  chain_id?: number; // 8453 = Base, 1 = Ethereum
 }
 
 export interface Trade {
@@ -48,6 +50,8 @@ export interface Trade {
   account_name?: string; // Seller's account name (new)
   alipay_id?: string; // Seller's account ID (legacy)
   alipay_name?: string; // Seller's account name (legacy)
+  // Multi-chain support
+  chain_id?: number; // 8453 = Base, 1 = Ethereum
 }
 
 // ============ API Client ============

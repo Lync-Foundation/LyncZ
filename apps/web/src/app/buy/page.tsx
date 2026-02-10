@@ -162,7 +162,7 @@ export default function BuyPage() {
                               return (
                                 <a
                                   key={trade.trade_id}
-                                  href={getTransactionUrl(settlementTxHash)}
+                                  href={getTransactionUrl(settlementTxHash, flowData.selectedOrder?.chain_id)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="block text-purple-600 hover:underline flex items-center justify-center gap-2"

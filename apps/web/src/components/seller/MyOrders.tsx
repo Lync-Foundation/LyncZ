@@ -87,10 +87,20 @@ export function MyOrders() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <CardTitle className="text-sm font-mono text-gray-700 dark:text-gray-300">
                   {t('orderPrefix')} {formatAddress(order.order_id)}
                 </CardTitle>
+                {/* Chain Badge */}
+                {order.chain_id === 1 ? (
+                  <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-lg bg-purple-500/10 border border-purple-400/20 text-purple-600 dark:text-purple-400">
+                    ETH
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-400/20 text-blue-600 dark:text-blue-400">
+                    Base
+                  </span>
+                )}
                 {/* Public/Private Badge - Liquid Glass Effect */}
                 {order.is_public ? (
                   <span className="inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-xl bg-transparent backdrop-blur-sm border border-emerald-400/20 text-emerald-600 dark:text-emerald-400 shadow-sm shadow-emerald-500/5">

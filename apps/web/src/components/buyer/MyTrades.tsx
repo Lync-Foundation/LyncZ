@@ -193,9 +193,21 @@ export function MyTrades({ unseenTradeIds = new Set(), onTradesSeen }: MyTradesP
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-sm font-mono text-gray-700 dark:text-gray-300">
-                {t('trade')} {formatAddress(trade.trade_id)}
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-mono text-gray-700 dark:text-gray-300">
+                  {t('trade')} {formatAddress(trade.trade_id)}
+                </CardTitle>
+                {/* Chain Badge */}
+                {trade.chain_id === 1 ? (
+                  <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-lg bg-purple-500/10 border border-purple-400/20 text-purple-600 dark:text-purple-400">
+                    ETH
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-400/20 text-blue-600 dark:text-blue-400">
+                    Base
+                  </span>
+                )}
+              </div>
               <CardDescription className="text-xs mt-1">
                 {t('created')} {new Date(trade.created_at * 1000).toLocaleString()}
               </CardDescription>
@@ -270,7 +282,7 @@ export function MyTrades({ unseenTradeIds = new Set(), onTradesSeen }: MyTradesP
             <div className="pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
               {trade.escrow_tx_hash && (
                 <a
-                  href={getTransactionUrl(trade.escrow_tx_hash)}
+                  href={getTransactionUrl(trade.escrow_tx_hash, trade.chain_id)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
@@ -281,7 +293,7 @@ export function MyTrades({ unseenTradeIds = new Set(), onTradesSeen }: MyTradesP
               )}
               {trade.settlement_tx_hash && (
                 <a
-                  href={getTransactionUrl(trade.settlement_tx_hash)}
+                  href={getTransactionUrl(trade.settlement_tx_hash, trade.chain_id)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 font-medium transition-colors"

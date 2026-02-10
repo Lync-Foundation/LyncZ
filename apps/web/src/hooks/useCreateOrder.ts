@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { parseUnits, Address, getAddress, keccak256, toBytes, decodeEventLog } from 'viem';
-import { ESCROW_ABI, ESCROW_ADDRESS, USDC_ABI, PaymentRail, PAYMENT_RAIL, computeAccountLinesHash } from '@/lib/contracts';
+import { ESCROW_ABI, USDC_ABI, PaymentRail, PAYMENT_RAIL, computeAccountLinesHash, getEscrowAddress } from '@/lib/contracts';
 import { submitPaymentInfo } from '@/lib/api';
 
 export interface CreateOrderParams {
@@ -13,6 +13,7 @@ export interface CreateOrderParams {
   accountId: string; // Payment account ID
   accountName: string; // Payment account name
   isPublic?: boolean; // v4: public or private order (default: true)
+  chainId?: number; // Chain ID for multi-chain support
 }
 
 export type CreateOrderStep = 'idle' | 'approving' | 'creating' | 'submitting-info' | 'success' | 'error';
@@ -120,19 +121,23 @@ export function useCreateOrder() {
 
       // Parse amount with token-specific decimals
       const amountWei = parseUnits(params.amount, params.tokenDecimals);
+      
+      // Get chain-specific escrow address
+      const escrowAddr = getEscrowAddress(params.chainId || 8453);
 
       // Step 1: Approve token
       console.log('Approving token...', { 
         token: params.tokenAddress,
         amount: amountWei.toString(), 
-        escrow: ESCROW_ADDRESS,
+        escrow: escrowAddr,
+        chainId: params.chainId,
       });
       
       approve({
         address: getAddress(params.tokenAddress),
         abi: USDC_ABI, // Generic ERC20 ABI works for all tokens
         functionName: 'approve',
-        args: [getAddress(ESCROW_ADDRESS), amountWei],
+        args: [getAddress(escrowAddr), amountWei],
       });
 
       // Wait for approval (handled by isApproving state)
@@ -157,6 +162,9 @@ export function useCreateOrder() {
       const accountLinesHash = await computeAccountLinesHash(params.accountName, params.accountId);
       const isPublic = params.isPublic !== false; // Default to true if not specified
       
+      // Get chain-specific escrow address
+      const escrowAddr = getEscrowAddress(params.chainId || 8453);
+      
       // Store params for backend submission after on-chain creation
       pendingParamsRef.current = params;
 
@@ -167,11 +175,13 @@ export function useCreateOrder() {
         rail: params.rail,
         accountLinesHash,
         isPublic,
+        chainId: params.chainId,
+        escrow: escrowAddr,
         // Plain text NOT sent to chain, only to backend after order creation
       });
 
       createOrder({
-        address: getAddress(ESCROW_ADDRESS),
+        address: getAddress(escrowAddr),
         abi: ESCROW_ABI,
         functionName: 'createOrder',
         args: [

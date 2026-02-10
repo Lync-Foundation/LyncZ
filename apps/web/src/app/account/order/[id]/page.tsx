@@ -50,6 +50,7 @@ interface OrderDto {
   created_at: number;
   is_public: boolean;
   private_code?: string;
+  chain_id?: number;
 }
 
 interface TradeActivity {
@@ -505,7 +506,7 @@ export default function OrderDetailPage() {
                       {tOrder('withdrawalSuccess')}{' '}
                       {withdrawTxHash && (
                         <a
-                          href={getTransactionUrl(withdrawTxHash)}
+                          href={getTransactionUrl(withdrawTxHash, data?.order?.chain_id)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="underline inline-flex items-center"
@@ -534,7 +535,7 @@ export default function OrderDetailPage() {
                       {tOrder('rateUpdateSuccess')}{' '}
                       {rateTxHash && (
                         <a
-                          href={getTransactionUrl(rateTxHash)}
+                          href={getTransactionUrl(rateTxHash, data?.order?.chain_id)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="underline inline-flex items-center"
@@ -779,7 +780,7 @@ export default function OrderDetailPage() {
                             </div>
                             {activity.settlement_tx && (
                               <a
-                                href={getTransactionUrl(activity.settlement_tx)}
+                                href={getTransactionUrl(activity.settlement_tx, data?.order?.chain_id)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline mt-2"
@@ -881,7 +882,7 @@ export default function OrderDetailPage() {
                             </div>
                             {activity.tx_hash && (
                               <a
-                                href={getTransactionUrl(activity.tx_hash)}
+                                href={getTransactionUrl(activity.tx_hash, data?.order?.chain_id)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline mt-2"

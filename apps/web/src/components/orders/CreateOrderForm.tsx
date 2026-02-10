@@ -12,16 +12,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, CheckCircle2, AlertCircle, ExternalLink, Coins, TrendingUp, Wallet, Globe, Lock, Copy, Check, Info } from 'lucide-react';
 import { useCreateOrder, CreateOrderParams } from '@/hooks/useCreateOrder';
-import { getTokenInfo, type TokenInfo, SUPPORTED_TOKENS, getFeeDisplayWithEquivalent } from '@/lib/tokens';
-import { PAYMENT_RAIL, PaymentRail } from '@/lib/contracts';
+import { getTokenInfo, type TokenInfo, getSupportedTokensForChain, getFeeDisplayWithEquivalent, CHAIN_IDS } from '@/lib/tokens';
+import { PAYMENT_RAIL, PaymentRail, getTransactionUrl, getChainName, getEscrowAddress } from '@/lib/contracts';
 import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
-import { CreditCard } from 'lucide-react';
+import { CreditCard, Network } from 'lucide-react';
 import { NetworkBadge } from '@/components/WalletButton';
 import { ConnectWalletButton } from '@/components/WalletButton';
 import { api } from '@/lib/api';
-
-const BASESCAN_URL = 'https://basescan.org/tx';
 
 interface CreateOrderFormProps {
   onSwitchToManage?: () => void;
@@ -33,16 +31,34 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
     isConnected, 
     isWrongChain, 
     canInteract, 
-    switchToBase 
+    chainId: walletChainId,
+    switchToChain,
+    isSwitching,
   } = useChainGuard();
   const t = useTranslations('sell.createOrder');
   
-  const [selectedToken, setSelectedToken] = useState<string>(SUPPORTED_TOKENS[0]);
-  const [tokenInfo, setTokenInfo] = useState<TokenInfo>(getTokenInfo(SUPPORTED_TOKENS[0]));
+  // Chain selection - default to Base
+  const [selectedChainId, setSelectedChainId] = useState<number>(CHAIN_IDS.BASE_MAINNET);
+  const chainTokens = getSupportedTokensForChain(selectedChainId);
+  
+  const [selectedToken, setSelectedToken] = useState<string>(chainTokens[0]);
+  const [tokenInfo, setTokenInfo] = useState<TokenInfo>(getTokenInfo(chainTokens[0]));
+  
+  // When chain changes, reset token to first token of new chain
+  useEffect(() => {
+    const newTokens = getSupportedTokensForChain(selectedChainId);
+    setSelectedToken(newTokens[0]);
+    setTokenInfo(getTokenInfo(newTokens[0]));
+    setAmount('');
+  }, [selectedChainId]);
+  
+  // Check if wallet is on the selected chain
+  const isOnSelectedChain = walletChainId === selectedChainId;
   
   const { data: tokenBalance } = useBalance({
     address: address,
     token: selectedToken as `0x${string}`,
+    chainId: selectedChainId,
   });
 
   const [amount, setAmount] = useState('');
@@ -138,10 +154,17 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Block submission if on wrong network
+    // Block submission if wallet not on selected chain
+    if (!isOnSelectedChain) {
+      console.warn('Wallet not on selected chain. Switching...');
+      switchToChain(selectedChainId);
+      return;
+    }
+    
+    // Block submission if on unsupported network
     if (isWrongChain || !canInteract) {
-      console.warn('Cannot submit: wrong network or not connected. Switching to Base...');
-      switchToBase();
+      console.warn('Cannot submit: wrong network or not connected.');
+      switchToChain(selectedChainId);
       return;
     }
     
@@ -161,6 +184,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
       accountId,
       accountName,
       isPublic: isPublicListing,  // v4: public/private flag
+      chainId: selectedChainId,   // multi-chain support
     };
 
     setOrderParams(params);
@@ -178,8 +202,8 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
   };
 
   const isFormValid = () => {
-    // Block form if not on correct chain
-    if (!canInteract) return false;
+    // Block form if not on correct chain or wallet not on selected chain
+    if (!canInteract || !isOnSelectedChain) return false;
     if (!amount || !exchangeRate || !accountId || !accountName) return false;
     if (parseFloat(amount) <= 0 || parseFloat(exchangeRate) <= 0) return false;
     if (tokenBalance && parseUnits(amount, tokenInfo.decimals) > tokenBalance.value) return false;
@@ -320,7 +344,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
                 <Button
                   variant="outline"
                   className="w-full border-purple-200/50 hover:border-purple-300/70 hover:bg-purple-50/50 dark:border-purple-500/30 dark:hover:border-purple-400/50 dark:hover:bg-purple-900/20 rounded-xl"
-                  onClick={() => window.open(`${BASESCAN_URL}/${createHash}`, '_blank')}
+                  onClick={() => window.open(getTransactionUrl(createHash, selectedChainId), '_blank')}
                 >
                   <ExternalLink className="mr-2 h-4 w-4 text-purple-500" />
                   {t('success.viewOnBaseScan')}
@@ -359,6 +383,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
                   setIsPublicListing(true);
                   setPrivateCode(null);
                   setCodeCopied(false);
+                  setSelectedChainId(CHAIN_IDS.BASE_MAINNET);
                 }}
               >
                 {t('success.createAnother')}
@@ -380,12 +405,98 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
           {t('subtitle')}
         </CardDescription>
         
-        {/* Base Network Badge with wrong network warning */}
+        {/* Network Badge with wrong network warning */}
         <NetworkBadge className="mt-3" />
       </CardHeader>
       
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Section 0: Select Network */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="relative space-y-4 p-6 bg-transparent rounded-2xl border border-cyan-200/15 dark:border-cyan-500/10"
+          >
+            {/* Left accent bar */}
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-cyan-400/60 via-cyan-300/40 to-cyan-400/60 rounded-l-2xl" />
+            <div className="flex items-center gap-3 mb-4 pl-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-cyan-100 to-cyan-50 dark:from-cyan-500/20 dark:to-cyan-500/10 rounded-xl flex items-center justify-center border border-cyan-200/50 dark:border-cyan-400/30">
+                <Network className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg flex items-center gap-2 text-slate-800 dark:text-white">
+                  {t('section0.title') || 'Select Network'}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{t('section0.subtitle') || 'Choose which blockchain to create your order on'}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pl-2">
+              <button
+                type="button"
+                onClick={() => setSelectedChainId(CHAIN_IDS.BASE_MAINNET)}
+                disabled={currentStep !== 'idle'}
+                className={`flex-1 p-4 rounded-xl border-2 transition-all duration-200 ${
+                  selectedChainId === CHAIN_IDS.BASE_MAINNET
+                    ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-500/10 ring-2 ring-blue-200/50 dark:ring-blue-500/30'
+                    : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-500/50'
+                }`}
+              >
+                <div className="flex items-center gap-3 justify-center">
+                  <div className={`w-3 h-3 rounded-full ${selectedChainId === CHAIN_IDS.BASE_MAINNET ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                  <div className="text-left">
+                    <p className={`font-semibold ${selectedChainId === CHAIN_IDS.BASE_MAINNET ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                      Base
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">L2 &middot; Low fees</p>
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedChainId(CHAIN_IDS.ETH_MAINNET)}
+                disabled={currentStep !== 'idle'}
+                className={`flex-1 p-4 rounded-xl border-2 transition-all duration-200 ${
+                  selectedChainId === CHAIN_IDS.ETH_MAINNET
+                    ? 'border-purple-400 bg-purple-50/50 dark:bg-purple-500/10 ring-2 ring-purple-200/50 dark:ring-purple-500/30'
+                    : 'border-slate-200 dark:border-slate-700 hover:border-purple-300 dark:hover:border-purple-500/50'
+                }`}
+              >
+                <div className="flex items-center gap-3 justify-center">
+                  <div className={`w-3 h-3 rounded-full ${selectedChainId === CHAIN_IDS.ETH_MAINNET ? 'bg-purple-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                  <div className="text-left">
+                    <p className={`font-semibold ${selectedChainId === CHAIN_IDS.ETH_MAINNET ? 'text-purple-700 dark:text-purple-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                      Ethereum
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">L1 &middot; USDT support</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* Prompt to switch wallet if on wrong chain */}
+            {isConnected && !isOnSelectedChain && (
+              <Alert className="border-amber-200/50 dark:border-amber-700/50 bg-gradient-to-r from-amber-50/80 to-orange-50/80 dark:from-amber-950/30 dark:to-orange-950/30 rounded-xl ml-2">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <AlertDescription className="text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                  {t('section0.switchNetwork') || `Switch your wallet to ${getChainName(selectedChainId)}`}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => switchToChain(selectedChainId)}
+                    disabled={isSwitching}
+                    className="ml-2 border-amber-300 hover:bg-amber-100 dark:border-amber-600 dark:hover:bg-amber-900/30 text-xs"
+                  >
+                    {isSwitching ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                    {t('section0.switch') || 'Switch'}
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+          </motion.div>
+
           {/* Section 1: What are you selling? */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -422,7 +533,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
-                  {SUPPORTED_TOKENS.map((tokenAddr) => {
+                  {chainTokens.map((tokenAddr) => {
                     const info = getTokenInfo(tokenAddr);
                     return (
                       <SelectItem key={tokenAddr} value={tokenAddr}>

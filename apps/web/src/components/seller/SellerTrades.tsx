@@ -97,9 +97,21 @@ export function SellerTrades() {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-sm font-mono text-gray-700 dark:text-gray-300">
-                {t('tradePrefix')} {formatAddress(trade.trade_id)}
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-mono text-gray-700 dark:text-gray-300">
+                  {t('tradePrefix')} {formatAddress(trade.trade_id)}
+                </CardTitle>
+                {/* Chain Badge */}
+                {trade.chain_id === 1 ? (
+                  <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-lg bg-purple-500/10 border border-purple-400/20 text-purple-600 dark:text-purple-400">
+                    ETH
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-400/20 text-blue-600 dark:text-blue-400">
+                    Base
+                  </span>
+                )}
+              </div>
               <CardDescription>
                 {t('created')} {new Date(trade.created_at * 1000).toLocaleString()}
               </CardDescription>
@@ -142,11 +154,11 @@ export function SellerTrades() {
             )}
           </div>
 
-          {/* Transaction Links */}
+          {/* Transaction Links (chain-aware) */}
           <div className="flex flex-wrap gap-2 text-sm">
             {trade.escrow_tx_hash && (
               <a
-                href={getTransactionUrl(trade.escrow_tx_hash)}
+                href={getTransactionUrl(trade.escrow_tx_hash, trade.chain_id)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
@@ -157,7 +169,7 @@ export function SellerTrades() {
             )}
             {trade.settlement_tx_hash && (
               <a
-                href={getTransactionUrl(trade.settlement_tx_hash)}
+                href={getTransactionUrl(trade.settlement_tx_hash, trade.chain_id)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"

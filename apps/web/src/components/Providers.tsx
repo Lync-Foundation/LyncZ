@@ -7,7 +7,7 @@ import { config } from '@/lib/wagmi';
 import { LocaleProvider } from './LocaleProvider';
 import { AuthInitializer } from './AuthInitializer';
 import { useState, useEffect, type ReactNode } from 'react';
-import { base } from 'wagmi/chains';
+import { base, mainnet } from 'wagmi/chains';
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
@@ -68,9 +68,9 @@ export function Providers({
             logo: '/logo-compact.svg',
             showWalletLoginFirst: true,
           },
-          // Default chain - enforce Base
+          // Default chain - Base, but support both Base and Ethereum
           defaultChain: base,
-          supportedChains: [base],
+          supportedChains: [base, mainnet],
           // Login methods
           loginMethods: ['wallet'],
           // Embedded wallet disabled - we only want external wallets

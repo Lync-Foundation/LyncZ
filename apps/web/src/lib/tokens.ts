@@ -1,6 +1,6 @@
 /**
- * Token utilities for multi-token support
- * Chain-aware configuration - uses NEXT_PUBLIC_CHAIN_ID to determine active tokens
+ * Token utilities for multi-token, multi-chain support
+ * Supports Base Mainnet (8453) and Ethereum Mainnet (1)
  */
 
 export interface TokenInfo {
@@ -11,9 +11,9 @@ export interface TokenInfo {
 }
 
 // Chain IDs
-const CHAIN_IDS = {
+export const CHAIN_IDS = {
   BASE_MAINNET: 8453,
-  BSC_MAINNET: 56,
+  ETH_MAINNET: 1,
 } as const;
 
 // Token configurations per chain
@@ -39,67 +39,96 @@ const CHAIN_TOKENS: Record<number, Record<string, TokenInfo>> = {
       address: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
     },
   },
-  // BSC Mainnet (for future USDT support)
-  [CHAIN_IDS.BSC_MAINNET]: {
-    '0x55d398326f99059ff775485246999027b3197955': {
-      symbol: 'USDT',
-      name: 'Tether USD',
-      decimals: 18,
-      address: '0x55d398326f99059fF775485246999027B3197955',
-    },
-    '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d': {
+  // Ethereum Mainnet
+  [CHAIN_IDS.ETH_MAINNET]: {
+    '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': {
       symbol: 'USDC',
       name: 'USD Coin',
+      decimals: 6,
+      address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    },
+    '0xdac17f958d2ee523a2206206994597c13d831ec7': {
+      symbol: 'USDT',
+      name: 'Tether USD',
+      decimals: 6,
+      address: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    },
+    '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2': {
+      symbol: 'WETH',
+      name: 'Wrapped ETH',
       decimals: 18,
-      address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',
+      address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+    },
+    '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599': {
+      symbol: 'WBTC',
+      name: 'Wrapped BTC',
+      decimals: 8,
+      address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
     },
   },
 };
 
 /**
- * Get current chain ID from environment
+ * Get tokens for a specific chain
  */
-function getChainId(): number {
-  const chainId = process.env.NEXT_PUBLIC_CHAIN_ID;
-  return chainId ? parseInt(chainId) : CHAIN_IDS.BASE_MAINNET;
-}
-
-/**
- * Get tokens for the current chain
- */
-function getChainTokens(): Record<string, TokenInfo> {
-  const chainId = getChainId();
+export function getTokensForChain(chainId: number): Record<string, TokenInfo> {
   return CHAIN_TOKENS[chainId] || CHAIN_TOKENS[CHAIN_IDS.BASE_MAINNET];
 }
 
 /**
- * List of supported token addresses for current chain
+ * Get supported token addresses for a specific chain
  */
-export const SUPPORTED_TOKENS = Object.values(getChainTokens()).map(t => t.address);
+export function getSupportedTokensForChain(chainId: number): string[] {
+  return Object.values(getTokensForChain(chainId)).map(t => t.address);
+}
 
 /**
- * Get the default/primary token for the current chain (first in list)
+ * Get tokens for ALL supported chains (merged)
+ * Used when displaying orders from all chains together
  */
-export function getDefaultToken(): TokenInfo {
-  const tokens = getChainTokens();
+function getAllChainTokens(): Record<string, TokenInfo> {
+  const merged: Record<string, TokenInfo> = {};
+  for (const chainTokens of Object.values(CHAIN_TOKENS)) {
+    for (const [key, value] of Object.entries(chainTokens)) {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+// ============ Legacy Exports (default to Base) ============
+
+/**
+ * List of supported token addresses for Base (legacy - backward compat)
+ */
+export const SUPPORTED_TOKENS = Object.values(getTokensForChain(CHAIN_IDS.BASE_MAINNET)).map(t => t.address);
+
+/**
+ * Get the default/primary token for a chain (first in list)
+ */
+export function getDefaultToken(chainId: number = CHAIN_IDS.BASE_MAINNET): TokenInfo {
+  const tokens = getTokensForChain(chainId);
   const firstKey = Object.keys(tokens)[0];
   return tokens[firstKey];
 }
 
 /**
- * Get default token address (useful for fallbacks)
+ * Get default token address
  */
-export function getDefaultTokenAddress(): string {
-  return getDefaultToken().address;
+export function getDefaultTokenAddress(chainId: number = CHAIN_IDS.BASE_MAINNET): string {
+  return getDefaultToken(chainId).address;
 }
 
 /**
  * Get token info by address (case-insensitive)
+ * Searches ALL chains to find the token
  */
 export function getTokenInfo(address: string): TokenInfo {
   const normalized = address.toLowerCase();
-  const tokens = getChainTokens();
-  const token = tokens[normalized];
+  
+  // Search all chains for this token
+  const allTokens = getAllChainTokens();
+  const token = allTokens[normalized];
   
   if (token) {
     return token;
@@ -229,13 +258,28 @@ const PRIVATE_FEE_USDC = BigInt(400000); // 0.4 USDC
 const ETH_PRICE_USDC = BigInt(3000);    // 1 ETH = 3000 USDC
 const BTC_PRICE_USDC = BigInt(100000);  // 1 BTC = 100000 USDC
 
-// Token addresses (Base Mainnet) - must match SimpleFeeCalculator.sol
-const USDC_ADDRESS = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
-const WETH_ADDRESS = '0x4200000000000000000000000000000000000006';
-const CBBTC_ADDRESS = '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf';
+// ============ Per-chain token address maps for fee computation ============
+
+// Base Mainnet token addresses (lowercase)
+const BASE_USDC_ADDRESS = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913';
+const BASE_WETH_ADDRESS = '0x4200000000000000000000000000000000000006';
+const BASE_CBBTC_ADDRESS = '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf';
+
+// Ethereum Mainnet token addresses (lowercase)
+const ETH_USDC_ADDRESS = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48';
+const ETH_USDT_ADDRESS = '0xdac17f958d2ee523a2206206994597c13d831ec7';
+const ETH_WETH_ADDRESS = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
+const ETH_WBTC_ADDRESS = '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599';
+
+// Sets of stablecoin, ETH, and BTC addresses across all chains
+const USDC_ADDRESSES = new Set([BASE_USDC_ADDRESS, ETH_USDC_ADDRESS]);
+const USDT_ADDRESSES = new Set([ETH_USDT_ADDRESS]);
+const WETH_ADDRESSES = new Set([BASE_WETH_ADDRESS, ETH_WETH_ADDRESS]);
+const BTC_ADDRESSES = new Set([BASE_CBBTC_ADDRESS, ETH_WBTC_ADDRESS]);
 
 /**
  * Get flat fee for a trade in token units
+ * Works across all chains by detecting token type from address
  * @param tokenAddress Token address
  * @param isPublic Whether order is public (0.2 USDC) or private (0.4 USDC)
  * @returns Fee amount in token's smallest unit (wei/satoshi/etc.)
@@ -244,15 +288,15 @@ export function getFlatFee(tokenAddress: string, isPublic: boolean): bigint {
   const normalized = tokenAddress.toLowerCase();
   const feeUsdc = isPublic ? PUBLIC_FEE_USDC : PRIVATE_FEE_USDC;
   
-  if (normalized === USDC_ADDRESS) {
-    // USDC: fee is already in correct units (6 decimals)
+  if (USDC_ADDRESSES.has(normalized) || USDT_ADDRESSES.has(normalized)) {
+    // USDC/USDT: fee is already in correct units (6 decimals)
     return feeUsdc;
-  } else if (normalized === WETH_ADDRESS) {
+  } else if (WETH_ADDRESSES.has(normalized)) {
     // WETH: Convert USDC to ETH
     // fee_wei = feeUsdc * 10^12 / ETH_PRICE_USDC
     return (feeUsdc * BigInt(1000000000000)) / ETH_PRICE_USDC;
-  } else if (normalized === CBBTC_ADDRESS) {
-    // cbBTC: Convert USDC to BTC
+  } else if (BTC_ADDRESSES.has(normalized)) {
+    // BTC (cbBTC or WBTC): Convert USDC to BTC
     // fee_satoshi = feeUsdc * 100 / BTC_PRICE_USDC
     return (feeUsdc * BigInt(100)) / BTC_PRICE_USDC;
   }
@@ -311,13 +355,13 @@ export function getFeeDisplayWithEquivalent(tokenAddress: string, isPublic: bool
   isUsdc: boolean;
 } {
   const normalized = tokenAddress.toLowerCase();
-  const isUsdc = normalized === USDC_ADDRESS;
+  const isUsdc = USDC_ADDRESSES.has(normalized) || USDT_ADDRESSES.has(normalized);
   const usdcEquivalent = getFlatFeeUsdcDisplay(isPublic);
   
   if (isUsdc) {
     return {
       feeAmount: usdcEquivalent,
-      feeSymbol: 'USDC',
+      feeSymbol: getTokenSymbol(tokenAddress),
       usdcEquivalent,
       isUsdc: true,
     };

@@ -1,18 +1,20 @@
 import { http, createConfig } from 'wagmi';
-import { base } from 'wagmi/chains';
+import { base, mainnet } from 'wagmi/chains';
 
-// RPC URL
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://mainnet.base.org';
+// RPC URLs
+const BASE_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://mainnet.base.org';
+const ETH_RPC_URL = process.env.NEXT_PUBLIC_ETH_RPC_URL || 'https://eth.llamarpc.com';
 
-// Target chain ID
-export const TARGET_CHAIN_ID = base.id; // 8453
+// Supported chain IDs
+export const SUPPORTED_CHAIN_IDS = [base.id, mainnet.id] as const; // [8453, 1]
 
 // Create a basic wagmi config for Privy
 // Privy manages connectors internally, we just need chains and transports
 export const config = createConfig({
-  chains: [base],
+  chains: [base, mainnet],
   transports: {
-    [base.id]: http(RPC_URL),
+    [base.id]: http(BASE_RPC_URL),
+    [mainnet.id]: http(ETH_RPC_URL),
   },
   ssr: true,
 });

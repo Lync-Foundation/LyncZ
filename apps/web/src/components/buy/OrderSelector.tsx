@@ -355,10 +355,16 @@ export function OrderSelector({
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
+                          <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <span className="font-semibold text-lg text-slate-800 dark:text-white">
                               ¥{formatRate(order.exchange_rate)} / {tokenSymbol}
                             </span>
+                            {/* Chain badge */}
+                            {order.chain_id === 1 ? (
+                              <Badge className="bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-300/40 text-xs px-1.5 py-0">ETH</Badge>
+                            ) : (
+                              <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-300/40 text-xs px-1.5 py-0">Base</Badge>
+                            )}
                             {globalIndex === 0 && sortBy === 'rate-asc' && (
                               <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-300/40">{t('bestRate')}</Badge>
                             )}

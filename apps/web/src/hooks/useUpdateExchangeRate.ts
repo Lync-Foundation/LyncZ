@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { ESCROW_ABI, ESCROW_ADDRESS, getAddress } from '@/lib/contracts';
+import { ESCROW_ABI, getAddress, getEscrowAddress } from '@/lib/contracts';
 
 export interface UpdateRateParams {
   orderId: string;
   newRate: string; // Rate in CNY (e.g., "7.35" for ¥7.35/USDC)
+  chainId?: number; // Chain ID for multi-chain support
 }
 
 export type UpdateRateStep = 'idle' | 'updating' | 'confirming' | 'success' | 'error';
@@ -106,8 +107,9 @@ export function useUpdateExchangeRate() {
         newRate: rateCents,
       });
 
+      const escrowAddr = getEscrowAddress(params.chainId || 8453);
       writeContract({
-        address: getAddress(ESCROW_ADDRESS),
+        address: getAddress(escrowAddr),
         abi: ESCROW_ABI,
         functionName: 'updateExchangeRate',
         args: [orderIdBytes as `0x${string}`, BigInt(rateCents)],

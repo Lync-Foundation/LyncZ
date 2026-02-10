@@ -1,32 +1,74 @@
 import { getAddress as viemGetAddress } from 'viem';
 
 // ============================================================================
-// Network Configuration (Base Mainnet)
+// Multi-Chain Network Configuration
 // ============================================================================
 
-export const CHAIN_ID = 8453; // Base Mainnet
-export const RPC_URL = 'https://mainnet.base.org';
+export interface ChainConfig {
+  chainId: number;
+  chainName: string;
+  rpcUrl: string;
+  blockExplorerUrl: string;
+  escrowAddress: `0x${string}`;
+}
+
+// Per-chain configuration
+const CHAIN_CONFIGS: Record<number, ChainConfig> = {
+  // Base Mainnet
+  8453: {
+    chainId: 8453,
+    chainName: 'Base',
+    rpcUrl: 'https://mainnet.base.org',
+    blockExplorerUrl: 'https://basescan.org',
+    escrowAddress: (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || '0x0') as `0x${string}`,
+  },
+  // Ethereum Mainnet
+  1: {
+    chainId: 1,
+    chainName: 'Ethereum',
+    rpcUrl: 'https://eth.llamarpc.com',
+    blockExplorerUrl: 'https://etherscan.io',
+    escrowAddress: (process.env.NEXT_PUBLIC_ETH_ESCROW_ADDRESS || '0x0') as `0x${string}`,
+  },
+};
+
+// Legacy exports for backward compatibility
+export const CHAIN_ID = 8453;
 export const BLOCK_EXPLORER_URL = 'https://basescan.org';
 export const CHAIN_NAME = 'Base';
-
-// ============================================================================
-// Contract Addresses
-// ============================================================================
-
-// Escrow contract - MUST be set via environment variable
-// No fallback - will throw error if not configured
-const _escrowAddress = process.env.NEXT_PUBLIC_ESCROW_ADDRESS;
-if (!_escrowAddress) {
-  throw new Error('NEXT_PUBLIC_ESCROW_ADDRESS environment variable is required');
-}
-export const ESCROW_ADDRESS = _escrowAddress as `0x${string}`;
+export const ESCROW_ADDRESS = CHAIN_CONFIGS[8453].escrowAddress;
 
 // Re-export getAddress for convenience
 export const getAddress = viemGetAddress;
 
-// Helper to get block explorer transaction URL
-export function getTransactionUrl(txHash: string): string {
-  return `${BLOCK_EXPLORER_URL}/tx/${txHash}`;
+// ============================================================================
+// Chain-aware helpers
+// ============================================================================
+
+/** Get the chain config for a given chain ID */
+export function getChainConfig(chainId: number): ChainConfig {
+  return CHAIN_CONFIGS[chainId] || CHAIN_CONFIGS[8453]; // Default to Base
+}
+
+/** Get escrow address for a specific chain */
+export function getEscrowAddress(chainId: number): `0x${string}` {
+  return getChainConfig(chainId).escrowAddress;
+}
+
+/** Get chain name for a specific chain ID */
+export function getChainName(chainId: number): string {
+  return getChainConfig(chainId).chainName;
+}
+
+/** Get block explorer URL for a specific chain */
+export function getBlockExplorerUrl(chainId: number): string {
+  return getChainConfig(chainId).blockExplorerUrl;
+}
+
+/** Get block explorer transaction URL (chain-aware) */
+export function getTransactionUrl(txHash: string, chainId?: number): string {
+  const explorerUrl = chainId ? getBlockExplorerUrl(chainId) : BLOCK_EXPLORER_URL;
+  return `${explorerUrl}/tx/${txHash}`;
 }
 
 // USDC ABI (ERC20)

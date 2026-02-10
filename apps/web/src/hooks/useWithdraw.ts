@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
-import { ESCROW_ABI, ESCROW_ADDRESS, getAddress } from '@/lib/contracts';
+import { ESCROW_ABI, getAddress, getEscrowAddress } from '@/lib/contracts';
 
 export interface WithdrawParams {
   orderId: string;
   amount: string; // Human-readable (e.g., "50.5")
   tokenAddress: string; // ERC20 token address
   tokenDecimals: number; // Token decimals (6, 9, 18, etc.)
+  chainId?: number; // Chain ID for multi-chain support
 }
 
 export type WithdrawStep = 'idle' | 'withdrawing' | 'confirming' | 'success' | 'error';
@@ -141,8 +142,9 @@ export function useWithdraw() {
       });
 
       // Send the transaction - let wallet handle gas estimation
+      const escrowAddr = getEscrowAddress(params.chainId || 8453);
       writeContract({
-        address: getAddress(ESCROW_ADDRESS),
+        address: getAddress(escrowAddr),
         abi: ESCROW_ABI,
         functionName: 'withdrawFromOrder',
         args: [orderIdBytes as `0x${string}`, amountWei],

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Coins, CreditCard, Wallet, ArrowRight, AlertCircle, Lock, Search, Loader2 } from 'lucide-react';
 import { BuyFlowData } from '@/app/buy/page';
-import { getTokenInfo, formatTokenAmount, type TokenInfo, SUPPORTED_TOKENS, getFlatFee } from '@/lib/tokens';
+import { getTokenInfo, formatTokenAmount, type TokenInfo, getSupportedTokensForChain, getFlatFee, CHAIN_IDS } from '@/lib/tokens';
 import { PAYMENT_RAIL } from '@/lib/contracts';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
@@ -35,8 +35,13 @@ export function BuyerInfoInput({ flowData, updateFlowData, goToNextStep, onPriva
   const isConnected = wagmiConnected && authenticated && ready;
   const t = useTranslations('buy.buyerInfo');
   
-  const [selectedToken, setSelectedToken] = useState<string>(flowData.tokenAddress || SUPPORTED_TOKENS[0]);
-  const [tokenInfo, setTokenInfo] = useState<TokenInfo>(getTokenInfo(SUPPORTED_TOKENS[0]));
+  // Tokens from all supported chains for buyer selection
+  const allTokens = [
+    ...getSupportedTokensForChain(CHAIN_IDS.BASE_MAINNET),
+    ...getSupportedTokensForChain(CHAIN_IDS.ETH_MAINNET),
+  ];
+  const [selectedToken, setSelectedToken] = useState<string>(flowData.tokenAddress || allTokens[0]);
+  const [tokenInfo, setTokenInfo] = useState<TokenInfo>(getTokenInfo(allTokens[0]));
   const [amount, setAmount] = useState(flowData.amount || '');
   const [paymentRail, setPaymentRail] = useState<number>(flowData.paymentRail ?? PAYMENT_RAIL.ALIPAY);
   const [useManualAddress, setUseManualAddress] = useState(!isConnected);
@@ -462,11 +467,14 @@ export function BuyerInfoInput({ flowData, updateFlowData, goToNextStep, onPriva
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {SUPPORTED_TOKENS.map((tokenAddr) => {
+                      {allTokens.map((tokenAddr) => {
                         const info = getTokenInfo(tokenAddr);
+                        // Determine which chain this token belongs to
+                        const isEth = getSupportedTokensForChain(CHAIN_IDS.ETH_MAINNET).includes(tokenAddr);
+                        const chainLabel = isEth ? '(ETH)' : '(Base)';
                         return (
                           <SelectItem key={tokenAddr} value={tokenAddr}>
-                            {info.symbol} - {info.name}
+                            {info.symbol} - {info.name} {chainLabel}
                           </SelectItem>
                         );
                       })}

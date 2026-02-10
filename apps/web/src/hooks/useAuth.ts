@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAccount, useSignMessage } from 'wagmi';
+import { useAccount, useSignMessage, useChainId } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
 import axios from 'axios';
 import { SiweMessage } from 'siwe';
@@ -31,6 +31,7 @@ export function useAuth() {
   const { address, isConnected: wagmiConnected } = useAccount();
   const { authenticated, ready } = usePrivy();
   const { signMessageAsync } = useSignMessage();
+  const currentChainId = useChainId();
   const isConnected = wagmiConnected && authenticated && ready;
   
   const [authState, setAuthState] = useState<AuthState>({
@@ -98,7 +99,7 @@ export function useAuth() {
         statement: 'Sign in to LyncZ to manage your orders and trades.',
         uri: window.location.origin,
         version: '1',
-        chainId: 8453, // Base mainnet
+        chainId: currentChainId || 8453, // Use connected chain, fallback to Base
         nonce: nonce,
       });
       const messageString = siweMessage.prepareMessage();
