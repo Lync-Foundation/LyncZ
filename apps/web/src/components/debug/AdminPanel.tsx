@@ -16,7 +16,9 @@ interface ContractConfig {
   fee_rate_bps: string;
   accumulated_fees_usdc: string;
   accumulated_fees_weth?: string;
-  accumulated_fees_cbbtc?: string;
+  accumulated_fees_btc?: string;
+  accumulated_fees_usdt?: string;
+  btc_token_label?: string;       // "cbBTC" for Base, "WBTC" for ETH
   paused: boolean;
   zk_verifier: string;
   public_key_der_hash: string;
@@ -219,7 +221,7 @@ export default function AdminPanel() {
                 </div>
                 <div className="col-span-2 space-y-2">
                   <span className="text-muted-foreground">Accumulated Fees:</span>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className={`grid gap-2 ${config.accumulated_fees_usdt !== undefined ? 'grid-cols-4' : 'grid-cols-3'}`}>
                     <div className="bg-blue-50 p-2 rounded">
                       <p className="font-mono font-semibold text-blue-600 text-xs break-all">
                         {(() => {
@@ -231,6 +233,19 @@ export default function AdminPanel() {
                         })()}
                       </p>
                     </div>
+                    {config.accumulated_fees_usdt !== undefined && (
+                      <div className="bg-teal-50 p-2 rounded">
+                        <p className="font-mono font-semibold text-teal-600 text-xs break-all">
+                          {(() => {
+                            const raw = config.accumulated_fees_usdt || '0';
+                            const val = BigInt(raw);
+                            const whole = val / BigInt(1e6);
+                            const frac = val % BigInt(1e6);
+                            return `${whole}.${frac.toString().padStart(6, '0')} USDT`;
+                          })()}
+                        </p>
+                      </div>
+                    )}
                     <div className="bg-purple-50 p-2 rounded">
                       <p className="font-mono font-semibold text-purple-600 text-xs break-all">
                         {(() => {
@@ -246,12 +261,13 @@ export default function AdminPanel() {
                     <div className="bg-orange-50 p-2 rounded">
                       <p className="font-mono font-semibold text-orange-600 text-xs break-all">
                         {(() => {
-                          const raw = config.accumulated_fees_cbbtc || '0';
+                          const raw = config.accumulated_fees_btc || '0';
                           const val = BigInt(raw);
                           const divisor = BigInt(1e8);
                           const whole = val / divisor;
                           const frac = val % divisor;
-                          return `${whole}.${frac.toString().padStart(8, '0')} cbBTC`;
+                          const label = config.btc_token_label || 'cbBTC';
+                          return `${whole}.${frac.toString().padStart(8, '0')} ${label}`;
                         })()}
                       </p>
                     </div>

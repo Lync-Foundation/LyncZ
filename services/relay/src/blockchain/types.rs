@@ -12,7 +12,10 @@ pub struct ContractConfig {
     pub fee_rate_bps: String,          // Fee rate in basis points (50 = 0.5%) - legacy
     pub accumulated_fees_usdc: String, // Accumulated USDC fees (in smallest unit, 6 decimals)
     pub accumulated_fees_weth: String, // Accumulated WETH fees (in wei, 18 decimals)
-    pub accumulated_fees_cbbtc: String, // Accumulated cbBTC fees (in satoshi, 8 decimals)
+    pub accumulated_fees_btc: String,  // Accumulated cbBTC/WBTC fees (in satoshi, 8 decimals)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accumulated_fees_usdt: Option<String>, // Accumulated USDT fees (6 decimals) - ETH only
+    pub btc_token_label: String,       // "cbBTC" for Base, "WBTC" for ETH
     pub paused: bool,
     pub zk_verifier: String,
     pub public_key_der_hash: String,

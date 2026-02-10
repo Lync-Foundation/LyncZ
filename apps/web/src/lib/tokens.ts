@@ -241,7 +241,7 @@ export function getExchangeRateLabel(tokenAddress: string): string {
   return `CNY/${symbol}`;
 }
 
-// ============ Flat Fee Constants (must match SimpleFeeCalculator.sol) ============
+// ============ Flat Fee Constants (must match BaseFeeCalculator.sol / EthFeeCalculator.sol) ============
 
 /**
  * Flat fee in USDC units (6 decimals)
@@ -253,7 +253,7 @@ const PRIVATE_FEE_USDC = BigInt(400000); // 0.4 USDC
 
 /**
  * Hardcoded token prices in USDC (no oracle)
- * Must match SimpleFeeCalculator.sol constants
+ * Must match BaseFeeCalculator.sol / EthFeeCalculator.sol constants
  */
 const ETH_PRICE_USDC = BigInt(3000);    // 1 ETH = 3000 USDC
 const BTC_PRICE_USDC = BigInt(100000);  // 1 BTC = 100000 USDC

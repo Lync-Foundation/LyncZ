@@ -353,11 +353,26 @@ impl EthereumClient {
         // Get fee rate (in basis points) - via external fee calculator
         let fee_rate = self.get_fee_rate().await.unwrap_or(U256::from(100)); // Default 1%
 
-        // Get accumulated fees for USDC
-        // Token addresses (Base Mainnet)
-        let usdc_address: Address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".parse().unwrap();
-        let weth_address: Address = "0x4200000000000000000000000000000000000006".parse().unwrap();
-        let cbbtc_address: Address = "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf".parse().unwrap();
+        // Get accumulated fees - token addresses differ by chain
+        let (usdc_address, weth_address, btc_address, usdt_address, btc_label): (Address, Address, Address, Option<Address>, &str) = 
+            match self.chain_id {
+                1 => (
+                    // Ethereum Mainnet
+                    "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".parse().unwrap(), // USDC
+                    "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".parse().unwrap(), // WETH
+                    "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599".parse().unwrap(), // WBTC
+                    Some("0xdAC17F958D2ee523a2206206994597C13D831ec7".parse().unwrap()), // USDT
+                    "WBTC",
+                ),
+                _ => (
+                    // Base Mainnet (default)
+                    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".parse().unwrap(), // USDC
+                    "0x4200000000000000000000000000000000000006".parse().unwrap(), // WETH
+                    "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf".parse().unwrap(), // cbBTC
+                    None, // No USDT on Base
+                    "cbBTC",
+                ),
+            };
         
         // Get accumulated fees for all tokens
         let accumulated_usdc = self.escrow_contract
@@ -370,11 +385,21 @@ impl EthereumClient {
             .call()
             .await
             .unwrap_or_default();
-        let accumulated_cbbtc = self.escrow_contract
-            .accumulated_fees(cbbtc_address)
+        let accumulated_btc = self.escrow_contract
+            .accumulated_fees(btc_address)
             .call()
             .await
             .unwrap_or_default();
+        let accumulated_usdt = if let Some(usdt_addr) = usdt_address {
+            Some(self.escrow_contract
+                .accumulated_fees(usdt_addr)
+                .call()
+                .await
+                .unwrap_or_default()
+                .to_string())
+        } else {
+            None
+        };
 
         // Get verifier address
         let verifier_address = self.get_alipay_verifier_address().await.unwrap_or(Address::zero());
@@ -436,7 +461,9 @@ impl EthereumClient {
             fee_rate_bps: fee_rate.to_string(),
             accumulated_fees_usdc: accumulated_usdc.to_string(),
             accumulated_fees_weth: accumulated_weth.to_string(),
-            accumulated_fees_cbbtc: accumulated_cbbtc.to_string(),
+            accumulated_fees_btc: accumulated_btc.to_string(),
+            accumulated_fees_usdt: accumulated_usdt,
+            btc_token_label: btc_label.to_string(),
             paused,
             zk_verifier: format!("{:#x}", verifier_address),
             public_key_der_hash: format!("0x{}", hex::encode(public_key_hash)),

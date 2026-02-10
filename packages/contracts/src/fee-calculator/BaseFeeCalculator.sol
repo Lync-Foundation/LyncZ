@@ -2,23 +2,21 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./interfaces/IFeeCalculator.sol";
+import "../interfaces/IFeeCalculator.sol";
 
 /**
- * @title SimpleFeeCalculator
- * @notice Flat-rate fee calculator with configurable fees and token prices
- * @dev Fee is a fixed amount per trade, not percentage-based
+ * @title BaseFeeCalculator
+ * @notice Flat-rate fee calculator for Base Mainnet (chain ID 8453)
+ * @dev Fee is a fixed amount per trade, not percentage-based.
+ *      Token addresses are hardcoded to Base Mainnet.
+ *      
+ *      Supported tokens: USDC, WETH, cbBTC
  *      
  *      Business Logic:
  *      - Public orders: configurable USDC flat fee (default 0.02 USDC)
  *      - Private orders: configurable USDC flat fee (default 0.01 USDC)
- *      
- *      Token conversion uses configurable USDC prices:
- *      - USDC: 1 USDC = 1 USDC
- *      - WETH: configurable (default 1 ETH = 3,000 USDC)
- *      - cbBTC: configurable (default 1 BTC = 100,000 USDC)
  */
-contract SimpleFeeCalculator is IFeeCalculator, Ownable {
+contract BaseFeeCalculator is IFeeCalculator, Ownable {
     
     // ============ Storage Variables ============
     

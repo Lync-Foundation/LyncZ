@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import "../src/LyncZEscrow.sol";
-import "../src/SimpleFeeCalculator.sol";
+import "../src/fee-calculator/BaseFeeCalculator.sol";
 import "../src/verifiers/AlipayVerifier.sol";
 import "../src/mocks/MockUSDC.sol";
 import "../src/mocks/MockUSDT.sol";
@@ -27,7 +27,7 @@ import "../src/mocks/MockUSDT.sol";
  *   MIN_TRADE_VALUE         - Minimum trade value in fiat cents (default: 70000 = 700 CNY)
  *   MAX_TRADE_VALUE         - Maximum trade value in fiat cents (default: 7200000 = 72,000 CNY)
  *   PAYMENT_WINDOW          - Payment window in seconds (default: 900 = 15 min)
- *   (Fees are hardcoded in SimpleFeeCalculator: 0.02 USDC public, 0.01 USDC private)
+ *   (Fees are hardcoded in BaseFeeCalculator: 0.02 USDC public, 0.01 USDC private)
  *   DEPLOY_MOCKS            - "true" to deploy new mock tokens, "false" to use existing
  */
 contract DeployLyncZ is Script {
@@ -70,7 +70,7 @@ contract DeployLyncZ is Script {
         uint256 minTradeValue = vm.envOr("MIN_TRADE_VALUE", uint256(70000));     // 700 CNY (~$100)
         uint256 maxTradeValue = vm.envOr("MAX_TRADE_VALUE", uint256(7200000));   // 72,000 CNY (~$10k)
         uint256 paymentWindow = vm.envOr("PAYMENT_WINDOW", uint256(900));        // 15 minutes
-        // Fee rates are now hardcoded in SimpleFeeCalculator (flat rate model)
+        // Fee rates are now hardcoded in BaseFeeCalculator (flat rate model)
         // Public: 0.02 USDC, Private: 0.01 USDC
         bool deployMocks = vm.envOr("DEPLOY_MOCKS", false);  // Default: use existing
         
@@ -131,9 +131,9 @@ contract DeployLyncZ is Script {
         console.log("");
         
         // ============ Deploy Fee Calculator ============
-        console.log("--- Deploying SimpleFeeCalculator ---");
-        SimpleFeeCalculator feeCalculator = new SimpleFeeCalculator();
-        console.log("SimpleFeeCalculator:", address(feeCalculator));
+        console.log("--- Deploying BaseFeeCalculator ---");
+        BaseFeeCalculator feeCalculator = new BaseFeeCalculator();
+        console.log("BaseFeeCalculator:", address(feeCalculator));
         console.log("Public flat fee: 0.02 USDC");
         console.log("Private flat fee: 0.01 USDC");
         console.log("");
