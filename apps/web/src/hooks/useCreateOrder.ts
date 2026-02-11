@@ -153,7 +153,7 @@ export function useCreateOrder() {
           address: tokenAddr,
           abi: approveAbi,
           functionName: 'approve',
-          args: [spenderAddr, 0n],
+          args: [spenderAddr, BigInt(0)],
         });
       } else {
         usdtResetPendingRef.current = false;
