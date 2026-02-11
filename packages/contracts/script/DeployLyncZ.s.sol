@@ -67,11 +67,11 @@ contract DeployLyncZ is Script {
         bytes32 alipayPublicKeyHash = vm.envOr("ALIPAY_PUBLIC_KEY_HASH", DEFAULT_ALIPAY_PK_HASH);
         bytes32 appExeCommit = vm.envOr("APP_EXE_COMMIT", DEFAULT_APP_EXE_COMMIT);
         bytes32 appVmCommit = vm.envOr("APP_VM_COMMIT", DEFAULT_APP_VM_COMMIT);
-        uint256 minTradeValue = vm.envOr("MIN_TRADE_VALUE", uint256(70000));     // 700 CNY (~$100)
+        uint256 minTradeValue = vm.envOr("MIN_TRADE_VALUE", uint256(1));           // 0.01 CNY (minimum)
         uint256 maxTradeValue = vm.envOr("MAX_TRADE_VALUE", uint256(7200000));   // 72,000 CNY (~$10k)
-        uint256 paymentWindow = vm.envOr("PAYMENT_WINDOW", uint256(900));        // 15 minutes
-        // Fee rates are now hardcoded in BaseFeeCalculator (flat rate model)
-        // Public: 0.02 USDC, Private: 0.01 USDC
+        uint256 paymentWindow = vm.envOr("PAYMENT_WINDOW", uint256(1500));       // 25 minutes
+        // Fee rates are set on BaseFeeCalculator after deployment
+        // Public: 0.2 USDC, Private: 0.4 USDC
         bool deployMocks = vm.envOr("DEPLOY_MOCKS", false);  // Default: use existing
         
         console.log("");
@@ -175,7 +175,7 @@ contract DeployLyncZ is Script {
         console.log("Min Trade Value:     ", minTradeValue, "cents");
         console.log("Max Trade Value:     ", maxTradeValue, "cents");
         console.log("Payment Window:      ", paymentWindow, "seconds");
-        console.log("Fee Model:            Flat rate (0.02 USDC public, 0.01 USDC private)");
+        console.log("Fee Model:            Flat rate (0.2 USDC public, 0.4 USDC private)");
         console.log("Owner:               ", escrow.owner());
         console.log("");
         console.log("Next Steps:");

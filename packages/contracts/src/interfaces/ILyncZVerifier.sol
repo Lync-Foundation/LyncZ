@@ -34,5 +34,5 @@ interface ILyncZVerifier {
         bytes32 txIdHash,
         uint256 amountCents,
         string calldata paymentTime
-    ) external view returns (bool valid);
+    ) external returns (bool valid);
 }

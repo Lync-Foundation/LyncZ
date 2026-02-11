@@ -81,8 +81,8 @@ contract BaseFeeCalculator is IFeeCalculator, Ownable {
      * @notice Initialize the fee calculator with default values
      */
     constructor() Ownable(msg.sender) {
-        publicFeeUsdc = 20000;    // 0.02 USDC
-        privateFeeUsdc = 10000;   // 0.01 USDC
+        publicFeeUsdc = 200000;   // 0.2 USDC
+        privateFeeUsdc = 400000;  // 0.4 USDC
         ethPriceUsdc = 3000;      // 1 ETH = 3000 USDC
         btcPriceUsdc = 100000;    // 1 BTC = 100000 USDC
     }

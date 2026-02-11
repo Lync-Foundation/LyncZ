@@ -35,6 +35,7 @@ contract AlipayVerifier is ILyncZVerifier, Ownable {
     // ============ Errors ============
     error ProofVerificationFailed();
     error HashMismatch(bytes32 expected, bytes32 actual);
+    error TransactionIdAlreadyUsed();
 
     // ============ Immutables ============
     IOpenVmHalo2Verifier public immutable halo2Verifier;
@@ -45,6 +46,11 @@ contract AlipayVerifier is ILyncZVerifier, Ownable {
     /// @notice Alipay's PDF signing certificate public key hash
     /// @dev Updated when Alipay rotates their certificate (~24 hours)
     bytes32 public alipayPublicKeyHash;
+    
+    /// @notice Mapping of used txIdHash values (anti-replay)
+    /// @dev txIdHash = SHA256(25_LE || transactionId) - plaintext txId never stored on-chain
+    ///      Moved here from LyncZEscrow so receipt validation is fully in the verifier
+    mapping(bytes32 => bool) public usedTransactionIds;
 
     // ============ Events ============
     event PublicKeyHashUpdated(bytes32 indexed oldHash, bytes32 indexed newHash);
@@ -86,7 +92,17 @@ contract AlipayVerifier is ILyncZVerifier, Ownable {
         bytes32 txIdHash,
         uint256 amountCents,
         string calldata paymentTime
-    ) external view override returns (bool) {
+    ) external override returns (bool) {
+        // Step 0: Anti-replay — check txIdHash not already used
+        // txIdHash = SHA256(25_LE || transactionId) computed off-chain
+        if (usedTransactionIds[txIdHash]) revert TransactionIdAlreadyUsed();
+        usedTransactionIds[txIdHash] = true;
+        
+        // Note: Payment time validation (old receipt attack prevention) is
+        // temporarily disabled. The paymentTime is still used for hash computation
+        // but not checked against trade.createdAt. This will be re-enabled once
+        // we have a reliable way to pass createdAt to the verifier.
+        
         // Step 1: Compute expected hash from accountLinesHash + txIdHash + time/amount
         bytes32 expectedHash = _computeExpectedHash(
             accountLinesHash,

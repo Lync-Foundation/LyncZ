@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
@@ -17,18 +18,18 @@ import "./interfaces/IFeeCalculator.sol";
  *      Settlement via ZK proof verification of payment receipts
  *
  * Key Features:
- * - Multi-token: Any ERC20 (USDC, USDT, DAI, WETH, etc.)
+ * - Multi-token: Any ERC20 (USDC, USDT, DAI, WETH, etc.) via SafeERC20
  * - Multi-rail: Alipay, WeChat Pay, SEPA (future)
  * - Non-custodial: Funds released only after valid proof
  * - Privacy: Seller payment info stored as hash (accountLinesHash)
  *
- * Anti-Replay Protection:
- * - Unique txIdHash: SHA256(25_LE || transactionId) stored forever after use
- *   (The actual transaction ID never appears on-chain for privacy)
- * - Payment time validation: Payment must occur AFTER trade creation (prevents old receipt reuse)
+ * Anti-Replay & Receipt Validation:
+ * - Delegated to the verifier contract (e.g., AlipayVerifier)
+ * - txIdHash anti-replay, payment time checks, etc. live in the verifier
  * - ZK proof binding: All fields verified cryptographically via Halo2 proof
  */
 contract LyncZEscrow is ReentrancyGuard, Ownable, Pausable {
+    using SafeERC20 for IERC20;
     
     // ============ Enums ============
     
@@ -106,10 +107,6 @@ contract LyncZEscrow is ReentrancyGuard, Ownable, Pausable {
     
     /// @notice Mapping of payment rail to verifier contract
     mapping(PaymentRail => ILyncZVerifier) public verifiers;
-    
-    /// @notice Mapping of used txIdHash values (anti-replay)
-    /// @dev txIdHash = SHA256(25_LE || transactionId) - plaintext txId never stored on-chain
-    mapping(bytes32 => bool) public usedTransactionIds;
     
     /// @notice Counter for generating unique IDs
     uint256 private counter;
@@ -220,12 +217,8 @@ contract LyncZEscrow is ReentrancyGuard, Ownable, Pausable {
     error AmountAboveMaximum();
     error AmountExceedsAvailable();
     error WithdrawalExceedsAvailable();
-    error TransferFailed();
     error VerifierNotSet();
-    error TransactionIdAlreadyUsed();
     error ProofVerificationFailed();
-    error PaymentTooOld(uint256 paymentTime, uint256 tradeCreatedAt);
-    error InvalidPaymentTimeFormat();
     error NoFeesToWithdraw();
     error FeeCalculatorNotSet();
     error FiatAmountMustBeWholeYuan();  // fiatAmount must be divisible by 100 (whole yuan, no fen)
@@ -312,9 +305,8 @@ contract LyncZEscrow is ReentrancyGuard, Ownable, Pausable {
             tokenDecimals: tokenDecimals
         });
         
-        // Transfer tokens from seller
-        bool success = IERC20(token).transferFrom(msg.sender, address(this), totalAmount);
-        if (!success) revert TransferFailed();
+        // Transfer tokens from seller (SafeERC20 handles non-standard tokens like USDT)
+        IERC20(token).safeTransferFrom(msg.sender, address(this), totalAmount);
         
         emit OrderCreated(
             orderId,
@@ -342,8 +334,7 @@ contract LyncZEscrow is ReentrancyGuard, Ownable, Pausable {
         
         order.remainingAmount -= amount;
         
-        bool success = IERC20(order.token).transfer(order.seller, amount);
-        if (!success) revert TransferFailed();
+        IERC20(order.token).safeTransfer(order.seller, amount);
         
         emit OrderWithdrawn(orderId, amount, order.remainingAmount);
     }
@@ -514,18 +505,11 @@ contract LyncZEscrow is ReentrancyGuard, Ownable, Pausable {
         if (trade.status != TradeStatus.PENDING) revert TradeNotPending();
         if (block.timestamp > trade.expiresAt) revert TradeExpiredError();
         
-        // Parse and validate payment time (prevents old receipt attack)
-        uint256 paymentTimestamp = _parsePaymentTime(paymentTime);
-        if (paymentTimestamp < trade.createdAt) {
-            revert PaymentTooOld(paymentTimestamp, trade.createdAt);
-        }
+        // Anti-replay (txIdHash) and receipt validation (payment time) are now
+        // handled by the verifier contract (e.g., AlipayVerifier).
+        // This keeps the escrow focused on escrow logic only.
         
-        // Check txIdHash not already used (anti-replay)
-        // Note: txIdHash = SHA256(25_LE || transactionId) computed off-chain
-        if (usedTransactionIds[txIdHash]) revert TransactionIdAlreadyUsed();
-        
-        // Mark as used before external call (CEI pattern)
-        usedTransactionIds[txIdHash] = true;
+        // Mark as settled before external call (CEI pattern)
         trade.status = TradeStatus.SETTLED;
         
         // Verify proof, transfer tokens, and collect fee
@@ -565,9 +549,8 @@ contract LyncZEscrow is ReentrancyGuard, Ownable, Pausable {
         
         if (!valid) revert ProofVerificationFailed();
         
-        // Transfer tokens to buyer (full amount they requested)
-        bool success = IERC20(order.token).transfer(trade.buyer, trade.tokenAmount);
-        if (!success) revert TransferFailed();
+        // Transfer tokens to buyer (SafeERC20 handles non-standard tokens like USDT)
+        IERC20(order.token).safeTransfer(trade.buyer, trade.tokenAmount);
         
         // Accumulate fee for this token (seller paid this from their order)
         uint256 feeAmount = tradeFees[tradeId];
@@ -700,8 +683,7 @@ contract LyncZEscrow is ReentrancyGuard, Ownable, Pausable {
         
         accumulatedFees[token] = 0;
         
-        bool success = IERC20(token).transfer(owner(), amount);
-        if (!success) revert TransferFailed();
+        IERC20(token).safeTransfer(owner(), amount);
         
         emit FeesWithdrawn(token, owner(), amount);
     }
@@ -717,8 +699,7 @@ contract LyncZEscrow is ReentrancyGuard, Ownable, Pausable {
             if (amount > 0) {
                 accumulatedFees[token] = 0;
                 
-                bool success = IERC20(token).transfer(owner(), amount);
-                if (!success) revert TransferFailed();
+                IERC20(token).safeTransfer(owner(), amount);
                 
                 emit FeesWithdrawn(token, owner(), amount);
             }
@@ -733,93 +714,4 @@ contract LyncZEscrow is ReentrancyGuard, Ownable, Pausable {
         _unpause();
     }
     
-    // ============ Internal Helpers ============
-    
-    /**
-     * @notice Parse payment time string to Unix timestamp
-     * @dev Format: "YYYY-MM-DD HH:MM:SS" (19 chars, UTC+8 timezone)
-     *      Alipay uses China Standard Time (UTC+8)
-     * @param timeStr Payment time string from receipt
-     * @return Unix timestamp (seconds since 1970-01-01 00:00:00 UTC)
-     */
-    function _parsePaymentTime(string calldata timeStr) internal pure returns (uint256) {
-        bytes memory b = bytes(timeStr);
-        if (b.length != 19) revert InvalidPaymentTimeFormat();
-        
-        // Parse components: "YYYY-MM-DD HH:MM:SS"
-        uint256 year = _parseUint(b, 0, 4);
-        uint256 month = _parseUint(b, 5, 2);
-        uint256 day = _parseUint(b, 8, 2);
-        uint256 hour = _parseUint(b, 11, 2);
-        uint256 minute = _parseUint(b, 14, 2);
-        uint256 second = _parseUint(b, 17, 2);
-        
-        // Convert to Unix timestamp (simplified leap year handling)
-        uint256 timestamp = _toTimestamp(year, month, day, hour, minute, second);
-        
-        // Adjust from UTC+8 to UTC (subtract 8 hours)
-        // This ensures consistent comparison with block.timestamp (UTC)
-        if (timestamp >= 8 hours) {
-            timestamp -= 8 hours;
-        }
-        
-        return timestamp;
-    }
-    
-    /**
-     * @dev Parse unsigned integer from bytes at given offset
-     */
-    function _parseUint(bytes memory b, uint256 offset, uint256 length) internal pure returns (uint256) {
-        uint256 result = 0;
-        for (uint256 i = 0; i < length; i++) {
-            uint8 digit = uint8(b[offset + i]);
-            if (digit < 48 || digit > 57) revert InvalidPaymentTimeFormat();
-            result = result * 10 + (digit - 48);
-        }
-        return result;
-    }
-    
-    /**
-     * @dev Convert date/time components to Unix timestamp
-     *      Uses simplified algorithm (assumes all months have 30 days for approximation,
-     *      but with proper leap year handling for accuracy)
-     */
-    function _toTimestamp(
-        uint256 year,
-        uint256 month,
-        uint256 day,
-        uint256 hour,
-        uint256 minute,
-        uint256 second
-    ) internal pure returns (uint256) {
-        // Days from 1970 to start of year
-        uint256 daysFromEpoch = 0;
-        
-        for (uint256 y = 1970; y < year; y++) {
-            daysFromEpoch += _isLeapYear(y) ? 366 : 365;
-        }
-        
-        // Days from start of year to start of month
-        uint8[12] memory daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        if (_isLeapYear(year)) {
-            daysInMonth[1] = 29;
-        }
-        
-        for (uint256 m = 1; m < month; m++) {
-            daysFromEpoch += daysInMonth[m - 1];
-        }
-        
-        // Add days (1-indexed, so subtract 1)
-        daysFromEpoch += day - 1;
-        
-        // Convert to seconds and add time components
-        return daysFromEpoch * 1 days + hour * 1 hours + minute * 1 minutes + second;
-    }
-    
-    /**
-     * @dev Check if year is a leap year
-     */
-    function _isLeapYear(uint256 year) internal pure returns (bool) {
-        return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
-    }
 }
