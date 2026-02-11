@@ -529,70 +529,71 @@ pub async fn submit_payment_info(
         computed_hash_hex
     );
     
-    // Fetch order to get its chain_id for blockchain verification
-    let order = state.db.get_order(&order_id).await
-        .map_err(|_| ApiError::BadRequest(format!("Order {} not found", order_id)))?;
+    // Try to fetch order to get its chain_id for blockchain verification
+    // NOTE: Order may not exist yet in DB if payment-info arrives before event listener syncs it
+    let order = state.db.get_order(&order_id).await.ok();
     
-    // Verify against blockchain with retry (handles RPC node sync delays)
-    // The frontend waits for tx confirmation, but our RPC node might be slightly behind
-    if let Some(blockchain_client) = state.get_blockchain_client(order.chain_id as u64) {
-        const MAX_RETRIES: u32 = 3;
-        const RETRY_DELAY_SECS: u64 = 3;
-        
-        let mut verified = false;
-        let mut last_on_chain_hash_hex = String::new();
-        
-        for attempt in 1..=MAX_RETRIES {
-            match blockchain_client.get_order_hash(&order_id).await {
-                Ok(on_chain_hash) => {
-                    last_on_chain_hash_hex = format!("0x{}", hex::encode(on_chain_hash));
-                    
-                    if on_chain_hash == computed_hash {
-                        tracing::info!("✅ Hash verified for order {} (attempt {})", order_id, attempt);
-                        verified = true;
-                        break;
-                    } else if attempt < MAX_RETRIES {
-                        tracing::info!(
-                            "⏳ Hash mismatch for order {} (attempt {}/{}), waiting {}s for RPC sync...",
-                            order_id, attempt, MAX_RETRIES, RETRY_DELAY_SECS
-                        );
-                        tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_DELAY_SECS)).await;
-                    }
-                }
-                Err(e) => {
-                    // Log warning but continue - allow storing even if we can't verify
-                    // This handles case where order was just created and blockchain query fails
-                    tracing::warn!("⚠️ Could not verify on-chain hash for order {} (attempt {}): {}", 
-                        order_id, attempt, e);
-                    verified = true; // Allow storing if we can't verify
-                    break;
-                }
-            }
-        }
-        
-        if !verified {
-            tracing::warn!(
-                "❌ Hash mismatch for order {} after {} retries:\n  computed: {}\n  on-chain: {}",
-                order_id, MAX_RETRIES, computed_hash_hex, last_on_chain_hash_hex
-            );
-            return Err(ApiError::BadRequest(format!(
-                "Hash mismatch: computed {} != on-chain {}. Please verify your account details.",
-                computed_hash_hex, last_on_chain_hash_hex
-            )));
-        }
-    } else {
-        tracing::warn!("⚠️ Blockchain client not configured for chain {}, skipping hash verification", order.chain_id);
-    }
-    
-    // Check if payment info already exists (updates not allowed - user must create new order)
-    {
+    if let Some(ref order) = order {
+        // Check if payment info already exists (updates not allowed - user must create new order)
         if !order.alipay_id.is_empty() && !order.alipay_name.is_empty() {
             tracing::warn!("❌ Payment info update rejected for order {} - updates not allowed", order_id);
             return Err(ApiError::BadRequest(
                 "Payment info already set. Updates are not allowed. Please create a new order if you need different payment details.".to_string()
             ));
         }
-    };
+        
+        // Verify against blockchain with retry (handles RPC node sync delays)
+        if let Some(blockchain_client) = state.get_blockchain_client(order.chain_id as u64) {
+            const MAX_RETRIES: u32 = 3;
+            const RETRY_DELAY_SECS: u64 = 3;
+            
+            let mut verified = false;
+            let mut last_on_chain_hash_hex = String::new();
+            
+            for attempt in 1..=MAX_RETRIES {
+                match blockchain_client.get_order_hash(&order_id).await {
+                    Ok(on_chain_hash) => {
+                        last_on_chain_hash_hex = format!("0x{}", hex::encode(on_chain_hash));
+                        
+                        if on_chain_hash == computed_hash {
+                            tracing::info!("✅ Hash verified for order {} (attempt {})", order_id, attempt);
+                            verified = true;
+                            break;
+                        } else if attempt < MAX_RETRIES {
+                            tracing::info!(
+                                "⏳ Hash mismatch for order {} (attempt {}/{}), waiting {}s for RPC sync...",
+                                order_id, attempt, MAX_RETRIES, RETRY_DELAY_SECS
+                            );
+                            tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_DELAY_SECS)).await;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("⚠️ Could not verify on-chain hash for order {} (attempt {}): {}", 
+                            order_id, attempt, e);
+                        verified = true; // Allow storing if we can't verify
+                        break;
+                    }
+                }
+            }
+            
+            if !verified {
+                tracing::warn!(
+                    "❌ Hash mismatch for order {} after {} retries:\n  computed: {}\n  on-chain: {}",
+                    order_id, MAX_RETRIES, computed_hash_hex, last_on_chain_hash_hex
+                );
+                return Err(ApiError::BadRequest(format!(
+                    "Hash mismatch: computed {} != on-chain {}. Please verify your account details.",
+                    computed_hash_hex, last_on_chain_hash_hex
+                )));
+            }
+        } else {
+            tracing::warn!("⚠️ Blockchain client not configured for chain {}, skipping hash verification", order.chain_id);
+        }
+    } else {
+        // Order not yet in DB (race condition - payment info arrived before event listener)
+        // Skip verification — the event listener UPSERT will preserve this payment info
+        tracing::info!("⏳ Order {} not yet in DB, storing payment info ahead of event sync", order_id);
+    }
     
     // Store plain text in database (initial submission only)
     state.db.update_payment_info(&order_id, &req.account_id, &req.account_name).await?;
