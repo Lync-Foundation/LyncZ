@@ -760,7 +760,7 @@
         "totalValue": "Total value",
         "platformFeeFlat": "Platform fee (per trade)",
         "feeExplanation1": "We charge a flat fee per trade, regardless of amount. Whether you trade ¥10 or ¥10,000, the fee stays the same.",
-        "feeExplanation2": "Public orders: 0.2 USDC/trade. Private orders: 0.4 USDC/trade.",
+        "feeExplanation2": "Base: Public 0.2 USDC, Private 0.4 USDC. Ethereum: Public 1.0 USDC, Private 1.5 USDC.",
         "cny": "CNY"
       },
       "section3": {

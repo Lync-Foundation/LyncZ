@@ -762,7 +762,7 @@
         "totalValue": "总价值",
         "platformFeeFlat": "平台手续费（每笔成交）",
         "feeExplanation1": "我们按每笔成交收取固定费用，无论金额大小。不管您单笔交易 10 元还是 10,000 元，手续费都一样。",
-        "feeExplanation2": "公开订单：0.2 USDC/笔。私密订单：0.4 USDC/笔。",
+        "feeExplanation2": "Base：公开 0.2 USDC，私密 0.4 USDC。Ethereum（以太坊）：公开 1.0 USDC，私密 1.5 USDC。",
         "cny": "人民币"
       },
       "section3": {

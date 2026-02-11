@@ -901,7 +901,7 @@ export default function HomePage() {
                       whileHover={{ scale: 1.03, y: -4 }}
                       transition={{ type: "spring", stiffness: 300 }}
                     >
-                      <img src="/hd-ethereum-eth-dark-logo-transparent-png-701751694771776u3bsi1hqxx.png" alt="Ethereum" className="h-10 w-auto dark:brightness-125" />
+                      <img src="/hd-ethereum-eth-dark-logo-transparent-png-701751694771776u3bsi1hqxx.png" alt="Ethereum" className="h-20 w-auto dark:brightness-125" />
                       <div className="flex-1" />
                       <span className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-sm font-bold">
                         {t('liveBadge')}

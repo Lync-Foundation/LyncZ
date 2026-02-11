@@ -762,7 +762,7 @@
         "totalValue": "總價值",
         "platformFeeFlat": "平台手續費（每筆成交）",
         "feeExplanation1": "我們按每筆成交收取固定費用，無論金額大小。不管您單筆交易 10 元還是 10,000 元，手續費都一樣。",
-        "feeExplanation2": "公開訂單：0.2 USDC/筆。私密訂單：0.4 USDC/筆。",
+        "feeExplanation2": "Base：公開 0.2 USDC，私密 0.4 USDC。Ethereum（以太坊）：公開 1.0 USDC，私密 1.5 USDC。",
         "cny": "人民幣"
       },
       "section3": {
