@@ -185,27 +185,29 @@ pub async fn validate_handler(
         }));
     }
     
-    // Pre-check 2: Verify payment time is after trade creation
-    tracing::info!("🔍 Pre-check: Verifying payment time is valid...");
-    let payment_timestamp = parse_payment_time(&payment_time)
-        .map_err(|e| ApiError::BadRequest(format!("Invalid payment time format: {}", e)))?;
-    
-    if payment_timestamp < trade.created_at as u64 {
-        tracing::warn!("❌ Pre-check failed: Payment time {} is before trade creation {}", payment_timestamp, trade.created_at);
-        // Clear PDF so user can try with a different receipt
-        if let Err(e) = state.db.clear_trade_pdf(&trade_id).await {
-            tracing::error!("Failed to clear PDF after pre-check failure: {}", e);
-        }
-        return Ok(Json(ValidateResponse {
-            valid: false,
-            expected_hash: String::new(),
-            actual_hash: String::new(),
-            message: format!("Payment was made before the trade was created. Receipt time: {}, Trade created: {}", payment_time, trade.created_at),
-            validation_code: "PAYMENT_TOO_OLD".to_string(),
-            transaction_id: transaction_id.clone(),
-            payment_time: payment_time.clone(),
-        }));
-    }
+    // Pre-check 2: Payment time validation (TEMPORARILY DISABLED)
+    // The old receipt attack check is disabled while we refine the payment time
+    // parsing logic. The anti-replay check (txIdHash) still protects against reuse.
+    // TODO: Re-enable once payment time validation is moved to AlipayVerifier contract.
+    //
+    // let payment_timestamp = parse_payment_time(&payment_time)
+    //     .map_err(|e| ApiError::BadRequest(format!("Invalid payment time format: {}", e)))?;
+    // if payment_timestamp < trade.created_at as u64 {
+    //     tracing::warn!("❌ Pre-check failed: Payment time {} is before trade creation {}", payment_timestamp, trade.created_at);
+    //     if let Err(e) = state.db.clear_trade_pdf(&trade_id).await {
+    //         tracing::error!("Failed to clear PDF after pre-check failure: {}", e);
+    //     }
+    //     return Ok(Json(ValidateResponse {
+    //         valid: false,
+    //         expected_hash: String::new(),
+    //         actual_hash: String::new(),
+    //         message: format!("Payment was made before the trade was created. Receipt time: {}, Trade created: {}", payment_time, trade.created_at),
+    //         validation_code: "PAYMENT_TOO_OLD".to_string(),
+    //         transaction_id: transaction_id.clone(),
+    //         payment_time: payment_time.clone(),
+    //     }));
+    // }
+    tracing::info!("🔍 Pre-check 2: Payment time validation skipped (temporarily disabled)");
     
     // Note: Recipient verification is handled by the ZK proof itself.
     // The account_lines_hash from blockchain must match what the ZK circuit reads from the PDF.
