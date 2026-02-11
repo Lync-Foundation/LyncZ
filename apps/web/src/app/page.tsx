@@ -895,15 +895,17 @@ export default function HomePage() {
                       </span>
                     </motion.div>
                     
-                    {/* BNB Chain - Coming Soon */}
+                    {/* Ethereum - Live */}
                     <motion.div 
-                      className="flex items-center gap-4 p-5 rounded-2xl bg-white/5 dark:bg-slate-700/15 backdrop-blur-sm border border-slate-200/20 dark:border-slate-600/20"
-                      whileHover={{ scale: 1.02 }}
+                      className="flex items-center gap-4 p-5 rounded-2xl bg-white/10 dark:bg-slate-700/20 backdrop-blur-sm shadow-sm border-2 border-emerald-400/25"
+                      whileHover={{ scale: 1.03, y: -4 }}
                       transition={{ type: "spring", stiffness: 300 }}
                     >
-                      <img src="/BNB Chain_Stacked_Logo_Yellow.svg" alt="BNB Chain" className="h-10 w-auto dark:brightness-110" />
+                      <img src="/hd-ethereum-eth-dark-logo-transparent-png-701751694771776u3bsi1hqxx.png" alt="Ethereum" className="h-10 w-auto dark:brightness-125" />
                       <div className="flex-1" />
-                      <span className="text-sm text-slate-400 font-medium">{t('comingSoon')}</span>
+                      <span className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-sm font-bold">
+                        {t('liveBadge')}
+                      </span>
                     </motion.div>
                   </div>
                 </motion.div>

@@ -125,7 +125,7 @@ export function OrderSelector({
         // Filter by sufficient remaining amount (including flat fee)
         // The seller's order must have enough to cover: buyer's token amount + flat fee
         const remainingWei = BigInt(order.remaining_amount);
-        const flatFee = getFlatFee(tokenAddress, order.is_public);
+        const flatFee = getFlatFee(tokenAddress, order.is_public, order.chain_id);
         const requiredWithFee = tokenAmount + flatFee;
         if (remainingWei < requiredWithFee) {
           console.log('[OrderSelector] Amount insufficient (including flat fee):', 
@@ -205,7 +205,7 @@ export function OrderSelector({
   
   // Calculate flat fee amount for a given order
   const calculateFeeDisplay = (order: Order) => {
-    const feeAmount = getFlatFee(tokenAddress, order.is_public);
+    const feeAmount = getFlatFee(tokenAddress, order.is_public, order.chain_id);
     const displayAmount = Number(feeAmount) / Math.pow(10, tokenDecimals);
     const decimals = getDisplayDecimals(displayAmount);
     return parseFloat(displayAmount.toFixed(decimals)).toString();
@@ -214,7 +214,7 @@ export function OrderSelector({
   // Net tokens after flat fee
   const calculateNetTokensDisplay = (order: Order) => {
     const tokenAmount = calculateTokenAmountForOrder(order);
-    const feeAmount = getFlatFee(tokenAddress, order.is_public);
+    const feeAmount = getFlatFee(tokenAddress, order.is_public, order.chain_id);
     const netAmount = tokenAmount - feeAmount;
     const displayAmount = Number(netAmount) / Math.pow(10, tokenDecimals);
     const decimals = getDisplayDecimals(displayAmount);

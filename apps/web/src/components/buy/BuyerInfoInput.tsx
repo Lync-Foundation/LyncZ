@@ -59,7 +59,7 @@ export function BuyerInfoInput({ flowData, updateFlowData, goToNextStep, onPriva
   // Calculate net purchasable amount for a private order (remaining - fee)
   const getNetPurchasableAmount = (order: Order): bigint => {
     const remaining = BigInt(order.remaining_amount);
-    const fee = getFlatFee(order.token, order.is_public);
+    const fee = getFlatFee(order.token, order.is_public, order.chain_id);
     const net = remaining > fee ? remaining - fee : BigInt(0);
     return net;
   };

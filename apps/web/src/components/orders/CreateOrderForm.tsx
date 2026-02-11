@@ -627,7 +627,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
               {amount && exchangeRate && (() => {
                 const amounts = calculateCnyAmount();
                 // Get flat fee display with USDC equivalent
-                const feeInfo = getFeeDisplayWithEquivalent(selectedToken, isPublicListing);
+                const feeInfo = getFeeDisplayWithEquivalent(selectedToken, isPublicListing, selectedChainId);
                 return (
                   <div className="mt-3 p-4 bg-gradient-to-br from-white/80 via-emerald-50/50 to-white/60 dark:from-slate-800/50 dark:via-emerald-900/20 dark:to-slate-800/40 rounded-xl border border-emerald-200/40 dark:border-emerald-500/20 space-y-2">
                     <div className="flex justify-between items-center">

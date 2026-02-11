@@ -244,12 +244,23 @@ export function getExchangeRateLabel(tokenAddress: string): string {
 // ============ Flat Fee Constants (must match BaseFeeCalculator.sol / EthFeeCalculator.sol) ============
 
 /**
- * Flat fee in USDC units (6 decimals)
- * Public orders: 0.2 USDC = 200000
- * Private orders: 0.4 USDC = 400000
+ * Flat fee in USDC units (6 decimals) — chain-specific
+ * Base:     Public 0.2 USDC (200000),  Private 0.4 USDC (400000)
+ * Ethereum: Public 1.0 USDC (1000000), Private 1.5 USDC (1500000)
  */
-const PUBLIC_FEE_USDC = BigInt(200000);  // 0.2 USDC
-const PRIVATE_FEE_USDC = BigInt(400000); // 0.4 USDC
+const CHAIN_FEES: Record<number, { public: bigint; private: bigint }> = {
+  [CHAIN_IDS.BASE_MAINNET]: { public: BigInt(200000), private: BigInt(400000) },
+  [CHAIN_IDS.ETH_MAINNET]:  { public: BigInt(1000000), private: BigInt(1500000) },
+};
+
+function getFeeUsdc(isPublic: boolean, chainId?: number): bigint {
+  const fees = CHAIN_FEES[chainId ?? CHAIN_IDS.BASE_MAINNET] ?? CHAIN_FEES[CHAIN_IDS.BASE_MAINNET];
+  return isPublic ? fees.public : fees.private;
+}
+
+// Legacy aliases for backward compatibility (Base defaults)
+const PUBLIC_FEE_USDC = BigInt(200000);  // 0.2 USDC (Base)
+const PRIVATE_FEE_USDC = BigInt(400000); // 0.4 USDC (Base)
 
 /**
  * Hardcoded token prices in USDC (no oracle)
@@ -284,9 +295,9 @@ const BTC_ADDRESSES = new Set([BASE_CBBTC_ADDRESS, ETH_WBTC_ADDRESS]);
  * @param isPublic Whether order is public (0.2 USDC) or private (0.4 USDC)
  * @returns Fee amount in token's smallest unit (wei/satoshi/etc.)
  */
-export function getFlatFee(tokenAddress: string, isPublic: boolean): bigint {
+export function getFlatFee(tokenAddress: string, isPublic: boolean, chainId?: number): bigint {
   const normalized = tokenAddress.toLowerCase();
-  const feeUsdc = isPublic ? PUBLIC_FEE_USDC : PRIVATE_FEE_USDC;
+  const feeUsdc = getFeeUsdc(isPublic, chainId);
   
   if (USDC_ADDRESSES.has(normalized) || USDT_ADDRESSES.has(normalized)) {
     // USDC/USDT: fee is already in correct units (6 decimals)
@@ -311,8 +322,8 @@ export function getFlatFee(tokenAddress: string, isPublic: boolean): bigint {
  * @param isPublic Whether order is public or private
  * @returns Human-readable fee amount (e.g., "0.02" for USDC)
  */
-export function getFlatFeeDisplay(tokenAddress: string, isPublic: boolean): string {
-  const fee = getFlatFee(tokenAddress, isPublic);
+export function getFlatFeeDisplay(tokenAddress: string, isPublic: boolean, chainId?: number): string {
+  const fee = getFlatFee(tokenAddress, isPublic, chainId);
   const decimals = getTokenDecimals(tokenAddress);
   const displayAmount = Number(fee) / Math.pow(10, decimals);
   
@@ -326,8 +337,8 @@ export function getFlatFeeDisplay(tokenAddress: string, isPublic: boolean): stri
 /**
  * Format flat fee with symbol (e.g., "0.4 USDC")
  */
-export function formatFlatFeeDisplay(tokenAddress: string, isPublic: boolean): string {
-  const feeDisplay = getFlatFeeDisplay(tokenAddress, isPublic);
+export function formatFlatFeeDisplay(tokenAddress: string, isPublic: boolean, chainId?: number): string {
+  const feeDisplay = getFlatFeeDisplay(tokenAddress, isPublic, chainId);
   const symbol = getTokenSymbol(tokenAddress);
   return `${feeDisplay} ${symbol}`;
 }
@@ -337,8 +348,8 @@ export function formatFlatFeeDisplay(tokenAddress: string, isPublic: boolean): s
  * @param isPublic Whether order is public or private
  * @returns Fee in USDC (e.g., "0.02")
  */
-export function getFlatFeeUsdcDisplay(isPublic: boolean): string {
-  const fee = isPublic ? PUBLIC_FEE_USDC : PRIVATE_FEE_USDC;
+export function getFlatFeeUsdcDisplay(isPublic: boolean, chainId?: number): string {
+  const fee = getFeeUsdc(isPublic, chainId);
   return (Number(fee) / 1000000).toFixed(2);
 }
 
@@ -348,7 +359,7 @@ export function getFlatFeeUsdcDisplay(isPublic: boolean): string {
  * @param isPublic Whether order is public or private
  * @returns Object with fee display info
  */
-export function getFeeDisplayWithEquivalent(tokenAddress: string, isPublic: boolean): {
+export function getFeeDisplayWithEquivalent(tokenAddress: string, isPublic: boolean, chainId?: number): {
   feeAmount: string;
   feeSymbol: string;
   usdcEquivalent: string;
@@ -356,7 +367,7 @@ export function getFeeDisplayWithEquivalent(tokenAddress: string, isPublic: bool
 } {
   const normalized = tokenAddress.toLowerCase();
   const isUsdc = USDC_ADDRESSES.has(normalized) || USDT_ADDRESSES.has(normalized);
-  const usdcEquivalent = getFlatFeeUsdcDisplay(isPublic);
+  const usdcEquivalent = getFlatFeeUsdcDisplay(isPublic, chainId);
   
   if (isUsdc) {
     return {
@@ -368,7 +379,7 @@ export function getFeeDisplayWithEquivalent(tokenAddress: string, isPublic: bool
   }
   
   // For non-USDC tokens, show token amount with USDC equivalent
-  const feeAmount = getFlatFeeDisplay(tokenAddress, isPublic);
+  const feeAmount = getFlatFeeDisplay(tokenAddress, isPublic, chainId);
   const feeSymbol = getTokenSymbol(tokenAddress);
   
   return {
