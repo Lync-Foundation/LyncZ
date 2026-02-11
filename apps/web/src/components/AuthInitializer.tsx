@@ -1,16 +1,15 @@
 'use client';
 
-import { useAuth } from '@/hooks/useAuth';
+// import { useAuth } from '@/hooks/useAuth';
 
 /**
  * Invisible component that initializes SIWE authentication.
  * 
- * Mount this inside the provider tree so it has access to wagmi + Privy.
- * When a wallet connects, it automatically triggers the SIWE sign-in flow,
- * storing a JWT token that authenticated API calls will use.
+ * NOTE: Authentication temporarily disabled. When re-enabling, uncomment
+ * the useAuth() call below and the import above.
  */
 export function AuthInitializer() {
-  // The hook handles everything: auto-auth on connect, cleanup on disconnect
-  useAuth();
+  // TODO: re-enable when auth is restored
+  // useAuth();
   return null;
 }
