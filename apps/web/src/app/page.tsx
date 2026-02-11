@@ -895,7 +895,8 @@ export default function HomePage() {
                       </span>
                     </motion.div>
                     
-                    {/* Ethereum - Live */}
+                    {/* Ethereum - Live (only shown when ETH is enabled) */}
+                    {process.env.NEXT_PUBLIC_ENABLE_ETH !== 'false' && (
                     <motion.div 
                       className="flex items-center gap-4 p-5 rounded-2xl bg-white/10 dark:bg-slate-700/20 backdrop-blur-sm shadow-sm border-2 border-emerald-400/25"
                       whileHover={{ scale: 1.03, y: -4 }}
@@ -907,6 +908,7 @@ export default function HomePage() {
                         {t('liveBadge')}
                       </span>
                     </motion.div>
+                    )}
                   </div>
                 </motion.div>
               </div>
