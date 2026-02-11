@@ -129,6 +129,7 @@ pub async fn debug_database(State(state): State<AppState>) -> ApiResult<Json<ser
         "chain_configs": chain_configs,
         "orders": orders,
         "trades": trades,
+        "trade_gas_costs": state.db.get_gas_costs_by_trades().await.unwrap_or_default(),
     })))
 }
 

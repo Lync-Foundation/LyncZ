@@ -97,7 +97,7 @@ export const api = {
    * On-chain only stores accountLinesHash for privacy. Plain text is stored
    * in the backend database for buyer display.
    */
-  async submitPaymentInfo(orderId: string, accountId: string, accountName: string, chainId?: number): Promise<{
+  async submitPaymentInfo(orderId: string, accountId: string, accountName: string, chainId?: number, txHash?: string): Promise<{
     success: boolean;
     message: string;
     computed_hash: string;
@@ -106,6 +106,7 @@ export const api = {
       account_id: accountId,
       account_name: accountName,
       chain_id: chainId,  // Required for on-chain hash verification
+      tx_hash: txHash,    // Fallback: if orderId is actually a txHash, backend can look up real orderId
     });
     return response.data;
   },

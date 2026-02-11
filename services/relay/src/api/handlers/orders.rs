@@ -484,6 +484,7 @@ pub struct PaymentInfoRequest {
     pub account_id: String,
     pub account_name: String,
     pub chain_id: Option<u64>,  // Required for blockchain hash verification when order not yet in DB
+    pub tx_hash: Option<String>,  // Fallback: if order_id is actually a tx hash, backend can look up real orderId
 }
 
 /// Response for payment info submission
@@ -551,6 +552,11 @@ pub async fn submit_payment_info(
     // CRITICAL: Always verify submitted payment info against on-chain accountLinesHash.
     // This ensures the plain text matches what the seller committed on-chain.
     // Without this check, anyone could submit fake payment info for any order.
+    //
+    // FALLBACK: If the order_id from the URL doesn't exist on-chain (all-zeros hash),
+    // the frontend may have sent a tx hash instead. Use tx_hash to look up the real orderId.
+    let mut effective_order_id = order_id.clone();
+    
     if let Some(chain_id) = chain_id {
         if let Some(blockchain_client) = state.get_blockchain_client(chain_id) {
             const MAX_RETRIES: u32 = 3;
@@ -558,27 +564,38 @@ pub async fn submit_payment_info(
             
             let mut verified = false;
             let mut last_on_chain_hash_hex = String::new();
+            let mut got_zero_hash = false;
             
             for attempt in 1..=MAX_RETRIES {
-                match blockchain_client.get_order_hash(&order_id).await {
+                match blockchain_client.get_order_hash(&effective_order_id).await {
                     Ok(on_chain_hash) => {
                         last_on_chain_hash_hex = format!("0x{}", hex::encode(on_chain_hash));
                         
                         if on_chain_hash == computed_hash {
-                            tracing::info!("✅ Hash verified on-chain for order {} (attempt {})", order_id, attempt);
+                            tracing::info!("✅ Hash verified on-chain for order {} (attempt {})", effective_order_id, attempt);
                             verified = true;
                             break;
+                        } else if on_chain_hash == [0u8; 32] {
+                            // Order doesn't exist on-chain — might be a tx hash instead
+                            got_zero_hash = true;
+                            if attempt < MAX_RETRIES {
+                                tracing::info!(
+                                    "⏳ Order {} returns zero hash (attempt {}/{}), may not exist yet or may be a tx hash, retrying...",
+                                    effective_order_id, attempt, MAX_RETRIES
+                                );
+                                tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_DELAY_SECS)).await;
+                            }
                         } else if attempt < MAX_RETRIES {
                             tracing::info!(
                                 "⏳ Hash mismatch for order {} (attempt {}/{}), waiting {}s for RPC sync...",
-                                order_id, attempt, MAX_RETRIES, RETRY_DELAY_SECS
+                                effective_order_id, attempt, MAX_RETRIES, RETRY_DELAY_SECS
                             );
                             tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_DELAY_SECS)).await;
                         }
                     }
                     Err(e) => {
                         tracing::warn!("⚠️ Could not query on-chain hash for order {} (attempt {}): {}", 
-                            order_id, attempt, e);
+                            effective_order_id, attempt, e);
                         if attempt < MAX_RETRIES {
                             tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_DELAY_SECS)).await;
                         }
@@ -586,10 +603,42 @@ pub async fn submit_payment_info(
                 }
             }
             
+            // FALLBACK: If we got zero hashes (order doesn't exist), try tx_hash to find real orderId
+            if !verified && got_zero_hash {
+                if let Some(ref tx_hash) = req.tx_hash {
+                    tracing::info!("🔄 Order {} not found on-chain (zero hash). Trying tx_hash fallback: {}", effective_order_id, tx_hash);
+                    match blockchain_client.get_order_id_from_tx(tx_hash).await {
+                        Ok(real_order_id) => {
+                            tracing::info!("🔄 Found real order ID from tx receipt: {} (was: {})", real_order_id, effective_order_id);
+                            effective_order_id = real_order_id;
+                            
+                            // Verify hash with the real order ID
+                            match blockchain_client.get_order_hash(&effective_order_id).await {
+                                Ok(on_chain_hash) => {
+                                    last_on_chain_hash_hex = format!("0x{}", hex::encode(on_chain_hash));
+                                    if on_chain_hash == computed_hash {
+                                        tracing::info!("✅ Hash verified for real order {} (via tx_hash fallback)", effective_order_id);
+                                        verified = true;
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!("⚠️ Could not verify hash for real order {}: {}", effective_order_id, e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("⚠️ Could not extract order ID from tx {}: {}", tx_hash, e);
+                        }
+                    }
+                } else {
+                    tracing::warn!("⚠️ Order {} has zero hash and no tx_hash provided for fallback", effective_order_id);
+                }
+            }
+            
             if !verified {
                 tracing::warn!(
-                    "❌ Hash verification failed for order {} after {} retries:\n  computed: {}\n  on-chain: {}",
-                    order_id, MAX_RETRIES, computed_hash_hex, last_on_chain_hash_hex
+                    "❌ Hash verification failed for order {} after retries:\n  computed: {}\n  on-chain: {}",
+                    effective_order_id, computed_hash_hex, last_on_chain_hash_hex
                 );
                 return Err(ApiError::BadRequest(format!(
                     "Hash mismatch: computed {} != on-chain {}. The submitted account info does not match what was committed on-chain.",
@@ -602,16 +651,16 @@ pub async fn submit_payment_info(
         }
     } else {
         // No chain_id from DB or request — cannot verify. Reject.
-        tracing::warn!("❌ Cannot verify payment info for order {} — no chain_id available", order_id);
+        tracing::warn!("❌ Cannot verify payment info for order {} — no chain_id available", effective_order_id);
         return Err(ApiError::BadRequest(
             "chain_id is required when order is not yet synced. Please include chain_id in the request.".to_string()
         ));
     }
     
-    // Store plain text in database (initial submission only)
-    state.db.update_payment_info(&order_id, &req.account_id, &req.account_name).await?;
+    // Store plain text in database using the effective (possibly resolved) order ID
+    state.db.update_payment_info(&effective_order_id, &req.account_id, &req.account_name).await?;
     
-    tracing::info!("✅ Payment info stored for order {}", order_id);
+    tracing::info!("✅ Payment info stored for order {} (requested as {})", effective_order_id, order_id);
     
     Ok(Json(PaymentInfoResponse {
         success: true,

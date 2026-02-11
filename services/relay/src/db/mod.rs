@@ -230,6 +230,12 @@ impl Database {
         repo.get_summary_by_chain(chain_id).await
     }
     
+    /// Get gas costs grouped by trade ID (for DB viewer)
+    pub async fn get_gas_costs_by_trades(&self) -> DbResult<Vec<gas_costs::TradeGasCost>> {
+        let repo = gas_costs::GasCostRepository::new(self.pool.clone());
+        repo.get_costs_by_trade().await
+    }
+    
     // ===== Withdrawal Methods (order activity timeline) =====
     
     /// Create a withdrawal record

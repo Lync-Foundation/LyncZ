@@ -69,6 +69,13 @@ interface ChainSummary {
   }> | null;
 }
 
+interface TradeGasCost {
+  trade_id: string;
+  total_cost_eth: string;
+  total_gas_used: number;
+  operations: number;
+}
+
 interface DatabaseDump {
   summary: {
     base: ChainSummary;
@@ -76,6 +83,7 @@ interface DatabaseDump {
   };
   orders: DbOrder[];
   trades: DbTrade[];
+  trade_gas_costs?: TradeGasCost[];
 }
 
 type ChainFilter = 'all' | 'base' | 'ethereum';
@@ -180,6 +188,14 @@ export default function DatabaseViewer() {
     if (chainFilter === 'ethereum') return o.chain_id === 1;
     return true;
   }) ?? [];
+
+  // Build lookup map for gas costs per trade
+  const tradeGasCostMap = new Map<string, TradeGasCost>();
+  if (data?.trade_gas_costs) {
+    for (const gc of data.trade_gas_costs) {
+      tradeGasCostMap.set(gc.trade_id, gc);
+    }
+  }
 
   const filteredTrades = data?.trades.filter(t => {
     if (chainFilter === 'all') return true;
@@ -383,6 +399,7 @@ export default function DatabaseViewer() {
                 <TableHead>Amount</TableHead>
                 <TableHead>CNY Amount</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Relay Fee (ETH)</TableHead>
                 <TableHead>Transaction ID</TableHead>
                 <TableHead>Expires</TableHead>
                 <TableHead>Escrow Tx</TableHead>
@@ -394,7 +411,7 @@ export default function DatabaseViewer() {
             <TableBody>
               {filteredTrades.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={13} className="text-center text-muted-foreground">
+                  <TableCell colSpan={14} className="text-center text-muted-foreground">
                     No trades found
                   </TableCell>
                 </TableRow>
@@ -431,6 +448,18 @@ export default function DatabaseViewer() {
                       }`}>
                         {getTradeStatus(trade.status)}
                       </span>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {(() => {
+                        const gc = tradeGasCostMap.get(trade.trade_id);
+                        if (!gc) return <span className="text-gray-400">—</span>;
+                        const eth = parseFloat(gc.total_cost_eth);
+                        return (
+                          <span title={`${gc.operations} ops, ${gc.total_gas_used.toLocaleString()} gas`}>
+                            {eth < 0.0001 ? eth.toExponential(2) : eth.toFixed(6)}
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="font-mono text-xs">
                       {trade.transaction_id ? (

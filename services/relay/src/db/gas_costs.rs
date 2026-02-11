@@ -89,4 +89,44 @@ impl GasCostRepository {
         
         Ok(summaries)
     }
+    
+    /// Get total gas cost per trade (for DB viewer display)
+    pub async fn get_costs_by_trade(&self) -> DbResult<Vec<TradeGasCost>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT 
+                "tradeId",
+                SUM("costEth")::TEXT as total_cost_eth,
+                SUM("gasUsed")::BIGINT as total_gas_used,
+                COUNT(*) as operations
+            FROM gas_costs
+            WHERE "tradeId" IS NOT NULL AND "tradeId" != ''
+            GROUP BY "tradeId"
+            ORDER BY "tradeId"
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        
+        use sqlx::Row;
+        let costs = rows.into_iter().map(|row| {
+            TradeGasCost {
+                trade_id: row.get("tradeId"),
+                total_cost_eth: row.get::<Option<String>, _>("total_cost_eth").unwrap_or_default(),
+                total_gas_used: row.get::<Option<i64>, _>("total_gas_used").unwrap_or(0),
+                operations: row.get("operations"),
+            }
+        }).collect();
+        
+        Ok(costs)
+    }
+}
+
+/// Gas cost for a specific trade
+#[derive(Debug, serde::Serialize)]
+pub struct TradeGasCost {
+    pub trade_id: String,
+    pub total_cost_eth: String,
+    pub total_gas_used: i64,
+    pub operations: i64,
 }

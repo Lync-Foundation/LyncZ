@@ -204,7 +204,9 @@ export function useCreateOrder() {
   const handleCreateSuccess = async () => {
     let extractedOrderId: string | null = null;
     
-    // Step 1: Try to extract order ID from transaction receipt
+    // Step 1: Try to extract order ID from transaction receipt (with retries)
+    // Some RPCs return receipts with empty/incomplete logs on very fresh blocks,
+    // so we retry a few times to ensure we get the OrderCreated event.
     try {
       if (!createHash || !publicClient) {
         console.warn('handleCreateSuccess: no createHash or publicClient');
@@ -212,26 +214,47 @@ export function useCreateOrder() {
         return;
       }
 
-      const receipt = await publicClient.getTransactionReceipt({ hash: createHash });
-      
-      // Find OrderCreated event in logs
       const eventSignature = 'OrderCreated(bytes32,address,address,uint256,uint256,uint8,bytes32,bool)';
       const eventTopic = keccak256(toBytes(eventSignature));
       
-      console.log('Looking for OrderCreated event with topic:', eventTopic);
-      console.log('Transaction receipt logs:', receipt.logs.map(l => ({ topics: l.topics, address: l.address })));
+      const MAX_RECEIPT_RETRIES = 4;
+      const RECEIPT_RETRY_DELAY_MS = 2000;
       
-      const orderLog = receipt.logs.find(log => 
-        log.topics[0]?.toLowerCase() === eventTopic.toLowerCase()
-      );
+      for (let attempt = 1; attempt <= MAX_RECEIPT_RETRIES; attempt++) {
+        try {
+          const receipt = await publicClient.getTransactionReceipt({ hash: createHash });
+          
+          console.log(`[attempt ${attempt}/${MAX_RECEIPT_RETRIES}] Receipt logs count: ${receipt.logs.length}`);
+          console.log('Receipt logs:', receipt.logs.map(l => ({ topics: l.topics, address: l.address })));
+          
+          const orderLog = receipt.logs.find(log => 
+            log.topics[0]?.toLowerCase() === eventTopic.toLowerCase()
+          );
+          
+          if (orderLog && orderLog.topics[1]) {
+            extractedOrderId = orderLog.topics[1];
+            console.log('Extracted order ID from logs:', extractedOrderId);
+            setOrderId(extractedOrderId);
+            break; // Success — exit retry loop
+          } else if (attempt < MAX_RECEIPT_RETRIES) {
+            console.warn(`[attempt ${attempt}/${MAX_RECEIPT_RETRIES}] OrderCreated event not found in ${receipt.logs.length} logs, retrying in ${RECEIPT_RETRY_DELAY_MS}ms...`);
+            await new Promise(resolve => setTimeout(resolve, RECEIPT_RETRY_DELAY_MS));
+          } else {
+            console.warn('OrderCreated event not found after all retries, falling back to tx hash');
+            console.log('Available event topics:', receipt.logs.map(l => l.topics[0]));
+          }
+        } catch (receiptErr) {
+          if (attempt < MAX_RECEIPT_RETRIES) {
+            console.warn(`[attempt ${attempt}/${MAX_RECEIPT_RETRIES}] Receipt fetch error, retrying:`, receiptErr);
+            await new Promise(resolve => setTimeout(resolve, RECEIPT_RETRY_DELAY_MS));
+          } else {
+            console.error('Receipt fetch failed after all retries:', receiptErr);
+          }
+        }
+      }
       
-      if (orderLog && orderLog.topics[1]) {
-        extractedOrderId = orderLog.topics[1];
-        console.log('Extracted order ID from logs:', extractedOrderId);
-        setOrderId(extractedOrderId);
-      } else {
-        console.warn('Could not find OrderCreated event in logs, falling back to tx hash');
-        console.log('Available event topics:', receipt.logs.map(l => l.topics[0]));
+      // Fallback to tx hash if extraction failed
+      if (!extractedOrderId) {
         setOrderId(createHash ?? null);
         extractedOrderId = createHash ?? null;
       }
@@ -242,6 +265,7 @@ export function useCreateOrder() {
     }
     
     // Step 2: Submit payment info (always attempt, even if order ID extraction had issues)
+    // Pass tx_hash so backend can look up the real orderId if we fell back to tx hash
     if (extractedOrderId && pendingParamsRef.current) {
       setCurrentStep('submitting-info');
       
@@ -251,9 +275,16 @@ export function useCreateOrder() {
           orderId: extractedOrderId,
           accountId: params.accountId,
           accountName: params.accountName,
+          txHash: createHash,
         });
         
-        await submitPaymentInfo(extractedOrderId, params.accountId, params.accountName, params.chainId);
+        await submitPaymentInfo(
+          extractedOrderId,
+          params.accountId,
+          params.accountName,
+          params.chainId,
+          createHash ?? undefined,  // tx_hash for backend fallback
+        );
         console.log('Payment info submitted successfully');
       } catch (backendErr) {
         // Log error but don't fail - order is already created on-chain

@@ -235,6 +235,36 @@ impl EthereumClient {
         Ok(order.7)
     }
 
+    /// Extract the real order ID from a transaction receipt by finding the OrderCreated event.
+    /// Used as a fallback when the frontend sends a tx hash instead of the real order ID.
+    /// 
+    /// OrderCreated event: topics[0]=sig, topics[1]=orderId(indexed), topics[2]=seller(indexed)
+    pub async fn get_order_id_from_tx(&self, tx_hash: &str) -> Result<String, EthereumClientError> {
+        let tx_hash = tx_hash.parse::<H256>()
+            .map_err(|e| EthereumClientError::ContractError(format!("Invalid tx hash: {}", e)))?;
+        
+        let receipt = self.provider
+            .get_transaction_receipt(tx_hash)
+            .await
+            .map_err(|e| EthereumClientError::ProviderError(format!("Failed to get receipt: {}", e)))?
+            .ok_or_else(|| EthereumClientError::ContractError("Transaction receipt not found".to_string()))?;
+        
+        // OrderCreated event signature: keccak256("OrderCreated(bytes32,address,address,uint256,uint256,uint8,bytes32,bool)")
+        // = 0x9f6b9c5cb3f3c820f7b25bf8bee9719189eecc5e2fe55367659ec4365c5003da
+        let event_sig: H256 = "0x9f6b9c5cb3f3c820f7b25bf8bee9719189eecc5e2fe55367659ec4365c5003da"
+            .parse().unwrap();
+        
+        for log in receipt.logs {
+            if log.topics.first() == Some(&event_sig) {
+                if let Some(order_id_topic) = log.topics.get(1) {
+                    return Ok(format!("0x{}", hex::encode(order_id_topic.as_bytes())));
+                }
+            }
+        }
+        
+        Err(EthereumClientError::ContractError("OrderCreated event not found in transaction receipt".to_string()))
+    }
+
     /// Check if trade exists on blockchain
     pub async fn trade_exists(&self, trade_id: [u8; 32]) -> Result<bool, EthereumClientError> {
         let trade = self
