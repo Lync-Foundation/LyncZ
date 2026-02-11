@@ -20,7 +20,7 @@ const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     chainName: 'Base',
     rpcUrl: 'https://mainnet.base.org',
     blockExplorerUrl: 'https://basescan.org',
-    escrowAddress: (process.env.NEXT_PUBLIC_ESCROW_ADDRESS || '0x0') as `0x${string}`,
+    escrowAddress: (process.env.NEXT_PUBLIC_BASE_ESCROW_ADDRESS || '0x0') as `0x${string}`,
   },
   // Ethereum Mainnet
   1: {

@@ -735,6 +735,12 @@
         "subtitle": "Please connect your wallet to create a sell order",
         "prompt": "Click the <strong>Connect Wallet</strong> button in the top right corner to get started"
       },
+      "section0": {
+        "title": "Select Network",
+        "subtitle": "Choose which blockchain to create your order on",
+        "baseSub": "L2 · Low fees",
+        "ethSub": "L1 · USDT support"
+      },
       "section1": {
         "title": "What are you selling?",
         "selectToken": "Select Token",

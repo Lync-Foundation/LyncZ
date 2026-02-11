@@ -2,7 +2,7 @@ import { http, createConfig } from 'wagmi';
 import { base, mainnet } from 'wagmi/chains';
 
 // RPC URLs
-const BASE_RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || 'https://mainnet.base.org';
+const BASE_RPC_URL = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org';
 const ETH_RPC_URL = process.env.NEXT_PUBLIC_ETH_RPC_URL || 'https://eth.llamarpc.com';
 
 // Supported chain IDs

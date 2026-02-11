@@ -737,6 +737,12 @@
         "subtitle": "请连接您的钱包以创建出售订单",
         "prompt": "点击右上角的 <strong>连接钱包</strong> 按钮开始"
       },
+      "section0": {
+        "title": "选择网络",
+        "subtitle": "选择在哪条区块链上创建您的订单",
+        "baseSub": "L2 · 低手续费",
+        "ethSub": "L1 · 支持 USDT"
+      },
       "section1": {
         "title": "您要出售什么？",
         "selectToken": "选择代币",

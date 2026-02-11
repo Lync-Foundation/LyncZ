@@ -737,6 +737,12 @@
         "subtitle": "請連接您的錢包以創建出售訂單",
         "prompt": "點擊右上角的 <strong>連接錢包</strong> 按鈕開始"
       },
+      "section0": {
+        "title": "選擇網路",
+        "subtitle": "選擇在哪條區塊鏈上創建您的訂單",
+        "baseSub": "L2 · 低手續費",
+        "ethSub": "L1 · 支援 USDT"
+      },
       "section1": {
         "title": "您要出售什麼？",
         "selectToken": "選擇代幣",
