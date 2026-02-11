@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { parseUnits, Address, getAddress, keccak256, toBytes, decodeEventLog } from 'viem';
-import { ESCROW_ABI, USDC_ABI, PaymentRail, PAYMENT_RAIL, computeAccountLinesHash, getEscrowAddress } from '@/lib/contracts';
+import { ESCROW_ABI, ERC20_ABI, USDT_ABI, isUSDT, PaymentRail, PAYMENT_RAIL, computeAccountLinesHash, getEscrowAddress } from '@/lib/contracts';
 import { submitPaymentInfo } from '@/lib/api';
 
 export interface CreateOrderParams {
@@ -76,6 +76,9 @@ export function useCreateOrder() {
   
   // v4: Store params for submitting to backend after on-chain creation
   const pendingParamsRef = useRef<CreateOrderParams | null>(null);
+  
+  // Track whether we're in a two-step USDT approval (reset to 0, then real amount)
+  const usdtResetPendingRef = useRef(false);
 
   const publicClient = usePublicClient();
   
@@ -94,6 +97,7 @@ export function useCreateOrder() {
     setCurrentStep('idle');
     setErrorCode(null);
     setOrderId(null);
+    usdtResetPendingRef.current = false;
   };
 
   // Handle approve errors
@@ -102,6 +106,7 @@ export function useCreateOrder() {
       console.error('Approval error:', approveError);
       setErrorCode(parseErrorCode(approveError));
       setCurrentStep('error');
+      usdtResetPendingRef.current = false;
     }
   }, [approveError]);
 
@@ -124,24 +129,44 @@ export function useCreateOrder() {
       
       // Get chain-specific escrow address
       const escrowAddr = getEscrowAddress(params.chainId || 8453);
+      const tokenAddr = getAddress(params.tokenAddress);
+      const spenderAddr = getAddress(escrowAddr);
+      const tokenIsUSDT = isUSDT(params.tokenAddress);
+      const approveAbi = tokenIsUSDT ? USDT_ABI : ERC20_ABI;
 
-      // Step 1: Approve token
       console.log('Approving token...', { 
         token: params.tokenAddress,
         amount: amountWei.toString(), 
         escrow: escrowAddr,
         chainId: params.chainId,
+        isUSDT: tokenIsUSDT,
       });
       
-      approve({
-        address: getAddress(params.tokenAddress),
-        abi: USDC_ABI, // Generic ERC20 ABI works for all tokens
-        functionName: 'approve',
-        args: [getAddress(escrowAddr), amountWei],
-      });
+      // USDT on Ethereum has two quirks:
+      // 1. approve() does NOT return bool (non-standard) — must use USDT_ABI
+      // 2. Cannot set non-zero allowance if current allowance is non-zero
+      //    → Must approve(0) first, then approve(realAmount) (two-step)
+      if (tokenIsUSDT) {
+        console.log('USDT detected — resetting allowance to 0 first');
+        usdtResetPendingRef.current = true;
+        approve({
+          address: tokenAddr,
+          abi: approveAbi,
+          functionName: 'approve',
+          args: [spenderAddr, 0n],
+        });
+      } else {
+        usdtResetPendingRef.current = false;
+        approve({
+          address: tokenAddr,
+          abi: approveAbi,
+          functionName: 'approve',
+          args: [spenderAddr, amountWei],
+        });
+      }
 
       // Wait for approval (handled by isApproving state)
-      // Once approved, move to creation step
+      // Once approved, move to creation step (or second USDT approval step)
     } catch (err) {
       console.error('Error in approval:', err);
       setErrorCode(parseErrorCode(err));
@@ -151,7 +176,23 @@ export function useCreateOrder() {
 
   // When approval succeeds, create the order
   // v4: Compute hash and pass to contract, store params for backend submission
+  // For USDT: first approve(0) completes, then we send real approve before creating
   const handleApprovalSuccess = async (params: CreateOrderParams) => {
+    // USDT two-step approval: if we just finished approve(0), send the real approve
+    if (usdtResetPendingRef.current) {
+      usdtResetPendingRef.current = false;
+      const amountWei = parseUnits(params.amount, params.tokenDecimals);
+      const escrowAddr = getEscrowAddress(params.chainId || 8453);
+      console.log('USDT: Allowance reset to 0 complete, now approving real amount:', amountWei.toString());
+      approve({
+        address: getAddress(params.tokenAddress),
+        abi: USDT_ABI,
+        functionName: 'approve',
+        args: [getAddress(escrowAddr), amountWei],
+      });
+      return; // Wait for second approval to complete — form effect will call us again
+    }
+    
     try {
       setCurrentStep('creating');
       

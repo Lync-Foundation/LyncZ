@@ -71,8 +71,8 @@ export function getTransactionUrl(txHash: string, chainId?: number): string {
   return `${explorerUrl}/tx/${txHash}`;
 }
 
-// USDC ABI (ERC20)
-export const USDC_ABI = [
+// Standard ERC20 ABI (USDC, WETH, WBTC, cbBTC, etc.)
+export const ERC20_ABI = [
   {
     inputs: [
       { name: 'spender', type: 'address' },
@@ -101,6 +101,49 @@ export const USDC_ABI = [
     type: 'function',
   },
 ] as const;
+
+// USDT has a non-standard approve that does NOT return bool.
+// Using the standard ABI causes viem simulation to fail (0 bytes vs expected 32 bytes).
+export const USDT_ABI = [
+  {
+    inputs: [
+      { name: '_spender', type: 'address' },
+      { name: '_value', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [],  // USDT does NOT return bool
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'account', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: '_owner', type: 'address' },
+      { name: '_spender', type: 'address' },
+    ],
+    name: 'allowance',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
+
+// Backward compatibility alias
+export const USDC_ABI = ERC20_ABI;
+
+// Ethereum Mainnet USDT address (non-standard approve)
+export const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
+
+/** Check if a token is USDT (non-standard approve) */
+export function isUSDT(tokenAddress: string): boolean {
+  return tokenAddress.toLowerCase() === USDT_ADDRESS.toLowerCase();
+}
 
 // Payment Rail enum values (must match contract)
 export const PAYMENT_RAIL = {
