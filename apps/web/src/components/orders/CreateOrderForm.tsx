@@ -79,7 +79,6 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
 
   const {
     executeCreateOrder,
-    handleApprovalSuccess,
     handleCreateSuccess,
     resetState,
     currentStep,
@@ -98,12 +97,8 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
     setTokenInfo(getTokenInfo(selectedToken));
   }, [selectedToken]);
 
-  // Handle approval success
-  useEffect(() => {
-    if (isApproveSuccess && orderParams && currentStep === 'approving') {
-      handleApprovalSuccess(orderParams);
-    }
-  }, [isApproveSuccess, orderParams, currentStep, handleApprovalSuccess]);
+  // NOTE: Approval success → create order transition is handled internally
+  // by the useCreateOrder hook (including USDT two-step approval).
 
   // Handle create success
   useEffect(() => {

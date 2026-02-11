@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { parseUnits, Address, getAddress, keccak256, toBytes, decodeEventLog } from 'viem';
 import { ESCROW_ABI, ERC20_ABI, USDT_ABI, isUSDT, PaymentRail, PAYMENT_RAIL, computeAccountLinesHash, getEscrowAddress } from '@/lib/contracts';
@@ -74,11 +74,14 @@ export function useCreateOrder() {
   const [errorCode, setErrorCode] = useState<CreateOrderErrorCode | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   
-  // v4: Store params for submitting to backend after on-chain creation
-  const pendingParamsRef = useRef<CreateOrderParams | null>(null);
+  // Store params for the entire flow (set in executeCreateOrder, used throughout)
+  const orderParamsRef = useRef<CreateOrderParams | null>(null);
   
-  // Track whether we're in a two-step USDT approval (reset to 0, then real amount)
-  const usdtResetPendingRef = useRef(false);
+  // Track USDT two-step approval: true = we just sent approve(0), waiting for it
+  const [usdtResetPhase, setUsdtResetPhase] = useState(false);
+  
+  // Track which approveHash we've already processed to avoid double-handling
+  const lastHandledApproveRef = useRef<string | null>(null);
 
   const publicClient = usePublicClient();
   
@@ -97,7 +100,9 @@ export function useCreateOrder() {
     setCurrentStep('idle');
     setErrorCode(null);
     setOrderId(null);
-    usdtResetPendingRef.current = false;
+    setUsdtResetPhase(false);
+    orderParamsRef.current = null;
+    lastHandledApproveRef.current = null;
   };
 
   // Handle approve errors
@@ -106,7 +111,7 @@ export function useCreateOrder() {
       console.error('Approval error:', approveError);
       setErrorCode(parseErrorCode(approveError));
       setCurrentStep('error');
-      usdtResetPendingRef.current = false;
+      setUsdtResetPhase(false);
     }
   }, [approveError]);
 
@@ -119,10 +124,53 @@ export function useCreateOrder() {
     }
   }, [createError]);
 
+  // ============ INTERNAL EFFECT: Handle approval success ============
+  // This handles BOTH normal approval and USDT two-step approval.
+  // The form component does NOT need to handle approval success at all.
+  useEffect(() => {
+    if (!isApproveSuccess || currentStep !== 'approving' || !approveHash) return;
+    
+    // Prevent double-handling of the same approval
+    if (lastHandledApproveRef.current === approveHash) return;
+    lastHandledApproveRef.current = approveHash;
+    
+    const params = orderParamsRef.current;
+    if (!params) {
+      console.error('Approval succeeded but no params stored');
+      return;
+    }
+    
+    if (usdtResetPhase) {
+      // USDT step 1 (approve 0) just completed → now send the real approve
+      console.log('USDT: approve(0) confirmed, now approving real amount');
+      setUsdtResetPhase(false);
+      
+      const amountWei = parseUnits(params.amount, params.tokenDecimals);
+      const escrowAddr = getEscrowAddress(params.chainId || 8453);
+      
+      approve({
+        address: getAddress(params.tokenAddress),
+        abi: USDT_ABI,
+        functionName: 'approve',
+        args: [getAddress(escrowAddr), amountWei],
+      });
+      return;
+    }
+    
+    // Normal approval completed (or USDT step 2) → proceed to create order
+    console.log('Approval confirmed, proceeding to create order');
+    proceedToCreateOrder(params);
+  }, [isApproveSuccess, approveHash, currentStep, usdtResetPhase]);
+
   const executeCreateOrder = async (params: CreateOrderParams) => {
     try {
       setErrorCode(null);
       setCurrentStep('approving');
+      setUsdtResetPhase(false);
+      lastHandledApproveRef.current = null;
+      
+      // Store params for use throughout the flow
+      orderParamsRef.current = params;
 
       // Parse amount with token-specific decimals
       const amountWei = parseUnits(params.amount, params.tokenDecimals);
@@ -148,7 +196,7 @@ export function useCreateOrder() {
       //    → Must approve(0) first, then approve(realAmount) (two-step)
       if (tokenIsUSDT) {
         console.log('USDT detected — resetting allowance to 0 first');
-        usdtResetPendingRef.current = true;
+        setUsdtResetPhase(true);
         approve({
           address: tokenAddr,
           abi: approveAbi,
@@ -156,7 +204,6 @@ export function useCreateOrder() {
           args: [spenderAddr, BigInt(0)],
         });
       } else {
-        usdtResetPendingRef.current = false;
         approve({
           address: tokenAddr,
           abi: approveAbi,
@@ -164,9 +211,6 @@ export function useCreateOrder() {
           args: [spenderAddr, amountWei],
         });
       }
-
-      // Wait for approval (handled by isApproving state)
-      // Once approved, move to creation step (or second USDT approval step)
     } catch (err) {
       console.error('Error in approval:', err);
       setErrorCode(parseErrorCode(err));
@@ -174,25 +218,8 @@ export function useCreateOrder() {
     }
   };
 
-  // When approval succeeds, create the order
-  // v4: Compute hash and pass to contract, store params for backend submission
-  // For USDT: first approve(0) completes, then we send real approve before creating
-  const handleApprovalSuccess = async (params: CreateOrderParams) => {
-    // USDT two-step approval: if we just finished approve(0), send the real approve
-    if (usdtResetPendingRef.current) {
-      usdtResetPendingRef.current = false;
-      const amountWei = parseUnits(params.amount, params.tokenDecimals);
-      const escrowAddr = getEscrowAddress(params.chainId || 8453);
-      console.log('USDT: Allowance reset to 0 complete, now approving real amount:', amountWei.toString());
-      approve({
-        address: getAddress(params.tokenAddress),
-        abi: USDT_ABI,
-        functionName: 'approve',
-        args: [getAddress(escrowAddr), amountWei],
-      });
-      return; // Wait for second approval to complete — form effect will call us again
-    }
-    
+  // Proceed to create the order on-chain (called after approval completes)
+  const proceedToCreateOrder = async (params: CreateOrderParams) => {
     try {
       setCurrentStep('creating');
       
@@ -205,9 +232,6 @@ export function useCreateOrder() {
       
       // Get chain-specific escrow address
       const escrowAddr = getEscrowAddress(params.chainId || 8453);
-      
-      // Store params for backend submission after on-chain creation
-      pendingParamsRef.current = params;
 
       console.log('Creating order (v4)...', {
         token: params.tokenAddress,
@@ -218,7 +242,6 @@ export function useCreateOrder() {
         isPublic,
         chainId: params.chainId,
         escrow: escrowAddr,
-        // Plain text NOT sent to chain, only to backend after order creation
       });
 
       createOrder({
@@ -242,12 +265,10 @@ export function useCreateOrder() {
   };
 
   // When order creation succeeds, extract order ID from logs and submit payment info to backend
-  const handleCreateSuccess = async () => {
+  const handleCreateSuccess = useCallback(async () => {
     let extractedOrderId: string | null = null;
     
     // Step 1: Try to extract order ID from transaction receipt (with retries)
-    // Some RPCs return receipts with empty/incomplete logs on very fresh blocks,
-    // so we retry a few times to ensure we get the OrderCreated event.
     try {
       if (!createHash || !publicClient) {
         console.warn('handleCreateSuccess: no createHash or publicClient');
@@ -266,7 +287,6 @@ export function useCreateOrder() {
           const receipt = await publicClient.getTransactionReceipt({ hash: createHash });
           
           console.log(`[attempt ${attempt}/${MAX_RECEIPT_RETRIES}] Receipt logs count: ${receipt.logs.length}`);
-          console.log('Receipt logs:', receipt.logs.map(l => ({ topics: l.topics, address: l.address })));
           
           const orderLog = receipt.logs.find(log => 
             log.topics[0]?.toLowerCase() === eventTopic.toLowerCase()
@@ -276,13 +296,12 @@ export function useCreateOrder() {
             extractedOrderId = orderLog.topics[1];
             console.log('Extracted order ID from logs:', extractedOrderId);
             setOrderId(extractedOrderId);
-            break; // Success — exit retry loop
+            break;
           } else if (attempt < MAX_RECEIPT_RETRIES) {
-            console.warn(`[attempt ${attempt}/${MAX_RECEIPT_RETRIES}] OrderCreated event not found in ${receipt.logs.length} logs, retrying in ${RECEIPT_RETRY_DELAY_MS}ms...`);
+            console.warn(`[attempt ${attempt}/${MAX_RECEIPT_RETRIES}] OrderCreated event not found, retrying in ${RECEIPT_RETRY_DELAY_MS}ms...`);
             await new Promise(resolve => setTimeout(resolve, RECEIPT_RETRY_DELAY_MS));
           } else {
             console.warn('OrderCreated event not found after all retries, falling back to tx hash');
-            console.log('Available event topics:', receipt.logs.map(l => l.topics[0]));
           }
         } catch (receiptErr) {
           if (attempt < MAX_RECEIPT_RETRIES) {
@@ -305,13 +324,12 @@ export function useCreateOrder() {
       extractedOrderId = createHash ?? null;
     }
     
-    // Step 2: Submit payment info (always attempt, even if order ID extraction had issues)
-    // Pass tx_hash so backend can look up the real orderId if we fell back to tx hash
-    if (extractedOrderId && pendingParamsRef.current) {
+    // Step 2: Submit payment info to backend
+    if (extractedOrderId && orderParamsRef.current) {
       setCurrentStep('submitting-info');
       
       try {
-        const params = pendingParamsRef.current;
+        const params = orderParamsRef.current;
         console.log('Submitting payment info to backend...', {
           orderId: extractedOrderId,
           accountId: params.accountId,
@@ -324,25 +342,23 @@ export function useCreateOrder() {
           params.accountId,
           params.accountName,
           params.chainId,
-          createHash ?? undefined,  // tx_hash for backend fallback
+          createHash ?? undefined,
         );
         console.log('Payment info submitted successfully');
       } catch (backendErr) {
-        // Log error but don't fail - order is already created on-chain
         console.error('Warning: Failed to submit payment info to backend:', backendErr);
       }
       
-      pendingParamsRef.current = null;
+      orderParamsRef.current = null;
     } else {
-      console.warn('Skipping payment info submission: extractedOrderId=', extractedOrderId, 'pendingParams=', !!pendingParamsRef.current);
+      console.warn('Skipping payment info submission: extractedOrderId=', extractedOrderId, 'params=', !!orderParamsRef.current);
     }
     
     setCurrentStep('success');
-  };
+  }, [createHash, publicClient]);
 
   return {
     executeCreateOrder,
-    handleApprovalSuccess,
     handleCreateSuccess,
     resetState,
     currentStep,
@@ -356,4 +372,3 @@ export function useCreateOrder() {
     isCreateSuccess,
   };
 }
-
