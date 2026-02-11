@@ -107,12 +107,14 @@ export function useUpdateExchangeRate() {
         newRate: rateCents,
       });
 
-      const escrowAddr = getEscrowAddress(params.chainId || 8453);
+      const chainId = params.chainId || 8453;
+      const escrowAddr = getEscrowAddress(chainId);
       writeContract({
         address: getAddress(escrowAddr),
         abi: ESCROW_ABI,
         functionName: 'updateExchangeRate',
         args: [orderIdBytes as `0x${string}`, BigInt(rateCents)],
+        chainId,
       });
     } catch (err) {
       console.error('Error updating exchange rate:', err);

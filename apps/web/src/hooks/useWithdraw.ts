@@ -142,12 +142,14 @@ export function useWithdraw() {
       });
 
       // Send the transaction - let wallet handle gas estimation
-      const escrowAddr = getEscrowAddress(params.chainId || 8453);
+      const chainId = params.chainId || 8453;
+      const escrowAddr = getEscrowAddress(chainId);
       writeContract({
         address: getAddress(escrowAddr),
         abi: ESCROW_ABI,
         functionName: 'withdrawFromOrder',
         args: [orderIdBytes as `0x${string}`, amountWei],
+        chainId,
       });
     } catch (err) {
       console.error('Error in withdrawal:', err);

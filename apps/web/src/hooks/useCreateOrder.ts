@@ -146,13 +146,15 @@ export function useCreateOrder() {
       setUsdtResetPhase(false);
       
       const amountWei = parseUnits(params.amount, params.tokenDecimals);
-      const escrowAddr = getEscrowAddress(params.chainId || 8453);
+      const chainId = params.chainId || 8453;
+      const escrowAddr = getEscrowAddress(chainId);
       
       approve({
         address: getAddress(params.tokenAddress),
         abi: USDT_ABI,
         functionName: 'approve',
         args: [getAddress(escrowAddr), amountWei],
+        chainId,
       });
       return;
     }
@@ -194,6 +196,8 @@ export function useCreateOrder() {
       // 1. approve() does NOT return bool (non-standard) — must use USDT_ABI
       // 2. Cannot set non-zero allowance if current allowance is non-zero
       //    → Must approve(0) first, then approve(realAmount) (two-step)
+      const chainId = params.chainId || 8453;
+      
       if (tokenIsUSDT) {
         console.log('USDT detected — resetting allowance to 0 first');
         setUsdtResetPhase(true);
@@ -202,6 +206,7 @@ export function useCreateOrder() {
           abi: approveAbi,
           functionName: 'approve',
           args: [spenderAddr, BigInt(0)],
+          chainId,
         });
       } else {
         approve({
@@ -209,6 +214,7 @@ export function useCreateOrder() {
           abi: approveAbi,
           functionName: 'approve',
           args: [spenderAddr, amountWei],
+          chainId,
         });
       }
     } catch (err) {
@@ -231,7 +237,8 @@ export function useCreateOrder() {
       const isPublic = params.isPublic !== false; // Default to true if not specified
       
       // Get chain-specific escrow address
-      const escrowAddr = getEscrowAddress(params.chainId || 8453);
+      const chainId = params.chainId || 8453;
+      const escrowAddr = getEscrowAddress(chainId);
 
       console.log('Creating order (v4)...', {
         token: params.tokenAddress,
@@ -240,7 +247,7 @@ export function useCreateOrder() {
         rail: params.rail,
         accountLinesHash,
         isPublic,
-        chainId: params.chainId,
+        chainId,
         escrow: escrowAddr,
       });
 
@@ -256,6 +263,7 @@ export function useCreateOrder() {
           accountLinesHash,  // v4: hash instead of plain text
           isPublic,          // v4: public/private flag
         ],
+        chainId,
       });
     } catch (err) {
       console.error('Error creating order:', err);
