@@ -740,8 +740,12 @@
       "section0": {
         "title": "选择网络",
         "subtitle": "选择在哪条区块链上创建您的订单",
+        "base": "Base",
         "baseSub": "L2 · 低手续费",
-        "ethSub": "L1 · 支持 USDT"
+        "eth": "Ethereum（以太坊）",
+        "ethSub": "L1 · 支持 USDT",
+        "switchNetwork": "请将钱包切换到所选网络",
+        "switch": "切换"
       },
       "section1": {
         "title": "您要出售什么？",

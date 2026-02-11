@@ -738,8 +738,12 @@
       "section0": {
         "title": "Select Network",
         "subtitle": "Choose which blockchain to create your order on",
+        "base": "Base",
         "baseSub": "L2 · Low fees",
-        "ethSub": "L1 · USDT support"
+        "eth": "Ethereum",
+        "ethSub": "L1 · USDT support",
+        "switchNetwork": "Switch your wallet to the selected network",
+        "switch": "Switch"
       },
       "section1": {
         "title": "What are you selling?",

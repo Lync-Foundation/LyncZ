@@ -740,8 +740,12 @@
       "section0": {
         "title": "選擇網路",
         "subtitle": "選擇在哪條區塊鏈上創建您的訂單",
+        "base": "Base",
         "baseSub": "L2 · 低手續費",
-        "ethSub": "L1 · 支援 USDT"
+        "eth": "Ethereum（以太坊）",
+        "ethSub": "L1 · 支援 USDT",
+        "switchNetwork": "請將錢包切換到所選網路",
+        "switch": "切換"
       },
       "section1": {
         "title": "您要出售什麼？",

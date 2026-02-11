@@ -442,9 +442,9 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
                   <div className={`w-3 h-3 rounded-full ${selectedChainId === CHAIN_IDS.BASE_MAINNET ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
                   <div className="text-left">
                     <p className={`font-semibold ${selectedChainId === CHAIN_IDS.BASE_MAINNET ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                      Base
+                      {t('section0.base')}
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">L2 &middot; Low fees</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('section0.baseSub')}</p>
                   </div>
                 </div>
               </button>
@@ -462,9 +462,9 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
                   <div className={`w-3 h-3 rounded-full ${selectedChainId === CHAIN_IDS.ETH_MAINNET ? 'bg-purple-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
                   <div className="text-left">
                     <p className={`font-semibold ${selectedChainId === CHAIN_IDS.ETH_MAINNET ? 'text-purple-700 dark:text-purple-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                      Ethereum
+                      {t('section0.eth')}
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">L1 &middot; USDT support</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('section0.ethSub')}</p>
                   </div>
                 </div>
               </button>
@@ -475,7 +475,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
               <Alert className="border-amber-200/50 dark:border-amber-700/50 bg-gradient-to-r from-amber-50/80 to-orange-50/80 dark:from-amber-950/30 dark:to-orange-950/30 rounded-xl ml-2">
                 <AlertCircle className="h-4 w-4 text-amber-500" />
                 <AlertDescription className="text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                  {t('section0.switchNetwork') || `Switch your wallet to ${getChainName(selectedChainId)}`}
+                  {t('section0.switchNetwork')}
                   <Button
                     type="button"
                     variant="outline"
@@ -485,7 +485,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
                     className="ml-2 border-amber-300 hover:bg-amber-100 dark:border-amber-600 dark:hover:bg-amber-900/30 text-xs"
                   >
                     {isSwitching ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                    {t('section0.switch') || 'Switch'}
+                    {t('section0.switch')}
                   </Button>
                 </AlertDescription>
               </Alert>
