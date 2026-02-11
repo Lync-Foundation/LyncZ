@@ -14,6 +14,7 @@ import { Loader2, CheckCircle2, AlertCircle, ExternalLink, Coins, TrendingUp, Wa
 import { useCreateOrder, CreateOrderParams } from '@/hooks/useCreateOrder';
 import { getTokenInfo, type TokenInfo, getSupportedTokensForChain, getFeeDisplayWithEquivalent, CHAIN_IDS } from '@/lib/tokens';
 import { PAYMENT_RAIL, PaymentRail, getTransactionUrl, getChainName, getEscrowAddress } from '@/lib/contracts';
+import { isChainEnabled, getDefaultChainId } from '@/lib/wagmi';
 import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { CreditCard, Network } from 'lucide-react';
@@ -37,8 +38,13 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
   } = useChainGuard();
   const t = useTranslations('sell.createOrder');
   
-  // Chain selection - default to Base
-  const [selectedChainId, setSelectedChainId] = useState<number>(CHAIN_IDS.BASE_MAINNET);
+  // Chain selection - default to first enabled chain
+  const [selectedChainId, setSelectedChainId] = useState<number>(getDefaultChainId());
+  
+  // Determine which chains are enabled for the selector
+  const baseEnabled = isChainEnabled(CHAIN_IDS.BASE_MAINNET);
+  const ethEnabled = isChainEnabled(CHAIN_IDS.ETH_MAINNET);
+  const bothChainsEnabled = baseEnabled && ethEnabled;
   const chainTokens = getSupportedTokensForChain(selectedChainId);
   
   const [selectedToken, setSelectedToken] = useState<string>(chainTokens[0]);
@@ -378,7 +384,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
                   setIsPublicListing(true);
                   setPrivateCode(null);
                   setCodeCopied(false);
-                  setSelectedChainId(CHAIN_IDS.BASE_MAINNET);
+                  setSelectedChainId(getDefaultChainId());
                 }}
               >
                 {t('success.createAnother')}
@@ -406,7 +412,8 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
       
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Section 0: Select Network */}
+          {/* Section 0: Select Network — only shown when both chains are enabled */}
+          {bothChainsEnabled && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -428,6 +435,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
             </div>
 
             <div className="flex gap-3 pl-2">
+              {baseEnabled && (
               <button
                 type="button"
                 onClick={() => setSelectedChainId(CHAIN_IDS.BASE_MAINNET)}
@@ -448,6 +456,8 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
                   </div>
                 </div>
               </button>
+              )}
+              {ethEnabled && (
               <button
                 type="button"
                 onClick={() => setSelectedChainId(CHAIN_IDS.ETH_MAINNET)}
@@ -468,6 +478,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
                   </div>
                 </div>
               </button>
+              )}
             </div>
 
             {/* Prompt to switch wallet if on wrong chain */}
@@ -491,6 +502,7 @@ export function CreateOrderForm({ onSwitchToManage }: CreateOrderFormProps = {})
               </Alert>
             )}
           </motion.div>
+          )}
 
           {/* Section 1: What are you selling? */}
           <motion.div

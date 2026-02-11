@@ -3,6 +3,8 @@
  * Supports Base Mainnet (8453) and Ethereum Mainnet (1)
  */
 
+import { isChainEnabled } from './wagmi';
+
 export interface TokenInfo {
   symbol: string;
   name: string;
@@ -70,15 +72,19 @@ const CHAIN_TOKENS: Record<number, Record<string, TokenInfo>> = {
 
 /**
  * Get tokens for a specific chain
+ * Returns empty record if the chain is disabled
  */
 export function getTokensForChain(chainId: number): Record<string, TokenInfo> {
+  if (!isChainEnabled(chainId)) return {};
   return CHAIN_TOKENS[chainId] || CHAIN_TOKENS[CHAIN_IDS.BASE_MAINNET];
 }
 
 /**
  * Get supported token addresses for a specific chain
+ * Returns empty array if the chain is disabled
  */
 export function getSupportedTokensForChain(chainId: number): string[] {
+  if (!isChainEnabled(chainId)) return [];
   return Object.values(getTokensForChain(chainId)).map(t => t.address);
 }
 

@@ -1,4 +1,5 @@
 import { getAddress as viemGetAddress } from 'viem';
+import { isChainEnabled, getDefaultChainId } from './wagmi';
 
 // ============================================================================
 // Multi-Chain Network Configuration
@@ -12,8 +13,8 @@ export interface ChainConfig {
   escrowAddress: `0x${string}`;
 }
 
-// Per-chain configuration
-const CHAIN_CONFIGS: Record<number, ChainConfig> = {
+// All possible chain configurations (before filtering by enabled flags)
+const ALL_CHAIN_CONFIGS: Record<number, ChainConfig> = {
   // Base Mainnet
   8453: {
     chainId: 8453,
@@ -32,11 +33,17 @@ const CHAIN_CONFIGS: Record<number, ChainConfig> = {
   },
 };
 
+// Filtered chain configs — only includes enabled chains
+const CHAIN_CONFIGS: Record<number, ChainConfig> = Object.fromEntries(
+  Object.entries(ALL_CHAIN_CONFIGS).filter(([id]) => isChainEnabled(Number(id)))
+);
+
 // Legacy exports for backward compatibility
-export const CHAIN_ID = 8453;
-export const BLOCK_EXPLORER_URL = 'https://basescan.org';
-export const CHAIN_NAME = 'Base';
-export const ESCROW_ADDRESS = CHAIN_CONFIGS[8453].escrowAddress;
+const defaultChainId = getDefaultChainId();
+export const CHAIN_ID = defaultChainId;
+export const BLOCK_EXPLORER_URL = (ALL_CHAIN_CONFIGS[defaultChainId] || ALL_CHAIN_CONFIGS[8453]).blockExplorerUrl;
+export const CHAIN_NAME = (ALL_CHAIN_CONFIGS[defaultChainId] || ALL_CHAIN_CONFIGS[8453]).chainName;
+export const ESCROW_ADDRESS = (ALL_CHAIN_CONFIGS[defaultChainId] || ALL_CHAIN_CONFIGS[8453]).escrowAddress;
 
 // Re-export getAddress for convenience
 export const getAddress = viemGetAddress;
@@ -47,7 +54,12 @@ export const getAddress = viemGetAddress;
 
 /** Get the chain config for a given chain ID */
 export function getChainConfig(chainId: number): ChainConfig {
-  return CHAIN_CONFIGS[chainId] || CHAIN_CONFIGS[8453]; // Default to Base
+  return ALL_CHAIN_CONFIGS[chainId] || ALL_CHAIN_CONFIGS[defaultChainId] || ALL_CHAIN_CONFIGS[8453];
+}
+
+/** Get only the enabled chain configs */
+export function getEnabledChainConfigs(): ChainConfig[] {
+  return Object.values(CHAIN_CONFIGS);
 }
 
 /** Get escrow address for a specific chain */

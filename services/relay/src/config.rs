@@ -76,6 +76,11 @@ impl Config {
         let mut chains = Vec::new();
         
         // --- Base chain (8453) ---
+        // Set ENABLE_BASE=false to disable (defaults to true)
+        let base_enabled = env::var("ENABLE_BASE")
+            .unwrap_or_else(|_| "true".to_string())
+            .to_lowercase() != "false";
+        
         // Try explicit BASE_* vars first, fall back to legacy CHAIN_ID/RPC_URL/ESCROW_ADDRESS
         let base_rpc = env::var("BASE_RPC_URL")
             .or_else(|_| env::var("RPC_URL"));
@@ -83,7 +88,9 @@ impl Config {
             .or_else(|_| env::var("ESCROW_ADDRESS"))
             .or_else(|_| env::var("ESCROW_CONTRACT_ADDRESS"));
         
-        if let (Ok(rpc), Ok(escrow)) = (base_rpc, base_escrow) {
+        if !base_enabled {
+            tracing::info!("⏸️  Base chain disabled via ENABLE_BASE=false");
+        } else if let (Ok(rpc), Ok(escrow)) = (base_rpc, base_escrow) {
             let chain_id = env::var("BASE_CHAIN_ID")
                 .or_else(|_| env::var("CHAIN_ID"))
                 .ok()
@@ -99,10 +106,17 @@ impl Config {
         }
         
         // --- Ethereum chain (1) ---
+        // Set ENABLE_ETH=false to disable (defaults to true)
+        let eth_enabled = env::var("ENABLE_ETH")
+            .unwrap_or_else(|_| "true".to_string())
+            .to_lowercase() != "false";
+        
         let eth_rpc = env::var("ETH_RPC_URL");
         let eth_escrow = env::var("ETH_ESCROW_ADDRESS");
         
-        if let (Ok(rpc), Ok(escrow)) = (eth_rpc, eth_escrow) {
+        if !eth_enabled {
+            tracing::info!("⏸️  Ethereum chain disabled via ENABLE_ETH=false");
+        } else if let (Ok(rpc), Ok(escrow)) = (eth_rpc, eth_escrow) {
             let chain_id = env::var("ETH_CHAIN_ID")
                 .ok()
                 .and_then(|s| s.parse().ok())
