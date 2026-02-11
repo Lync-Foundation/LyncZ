@@ -1,4 +1,5 @@
-import { http, createConfig, type Chain } from 'wagmi';
+import { http, createConfig } from 'wagmi';
+import { type Chain } from 'viem';
 import { base, mainnet } from 'wagmi/chains';
 
 // RPC URLs
