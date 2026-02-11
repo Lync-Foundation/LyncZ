@@ -202,29 +202,30 @@ export function useCreateOrder() {
 
   // When order creation succeeds, extract order ID from logs and submit payment info to backend
   const handleCreateSuccess = async () => {
+    let extractedOrderId: string | null = null;
+    
+    // Step 1: Try to extract order ID from transaction receipt
     try {
-      if (!createHash || !publicClient) return;
+      if (!createHash || !publicClient) {
+        console.warn('handleCreateSuccess: no createHash or publicClient');
+        setCurrentStep('success');
+        return;
+      }
 
       const receipt = await publicClient.getTransactionReceipt({ hash: createHash });
       
       // Find OrderCreated event in logs
-      // v4 Event signature: OrderCreated(bytes32 indexed orderId, address indexed seller, address indexed token, 
-      //                                  uint256 totalAmount, uint256 exchangeRate, uint8 rail, bytes32 accountLinesHash, bool isPublic)
       const eventSignature = 'OrderCreated(bytes32,address,address,uint256,uint256,uint8,bytes32,bool)';
       const eventTopic = keccak256(toBytes(eventSignature));
       
       console.log('Looking for OrderCreated event with topic:', eventTopic);
       console.log('Transaction receipt logs:', receipt.logs.map(l => ({ topics: l.topics, address: l.address })));
       
-      // Find the log with this topic
       const orderLog = receipt.logs.find(log => 
         log.topics[0]?.toLowerCase() === eventTopic.toLowerCase()
       );
       
-      let extractedOrderId: string | null = null;
-      
       if (orderLog && orderLog.topics[1]) {
-        // topics[1] is the indexed orderId (bytes32)
         extractedOrderId = orderLog.topics[1];
         console.log('Extracted order ID from logs:', extractedOrderId);
         setOrderId(extractedOrderId);
@@ -234,38 +235,37 @@ export function useCreateOrder() {
         setOrderId(createHash ?? null);
         extractedOrderId = createHash ?? null;
       }
+    } catch (err) {
+      console.error('Error extracting order ID from receipt:', err);
+      setOrderId(createHash ?? null);
+      extractedOrderId = createHash ?? null;
+    }
+    
+    // Step 2: Submit payment info (always attempt, even if order ID extraction had issues)
+    if (extractedOrderId && pendingParamsRef.current) {
+      setCurrentStep('submitting-info');
       
-      // v4: Submit plain text payment info to backend
-      // This is required for buyers to see the payment account details
-      if (extractedOrderId && pendingParamsRef.current) {
-        setCurrentStep('submitting-info');
+      try {
+        const params = pendingParamsRef.current;
+        console.log('Submitting payment info to backend...', {
+          orderId: extractedOrderId,
+          accountId: params.accountId,
+          accountName: params.accountName,
+        });
         
-        try {
-          const params = pendingParamsRef.current;
-          console.log('Submitting payment info to backend...', {
-            orderId: extractedOrderId,
-            accountId: params.accountId,
-            accountName: params.accountName,
-          });
-          
-          await submitPaymentInfo(extractedOrderId, params.accountId, params.accountName);
-          console.log('Payment info submitted successfully');
-        } catch (backendErr) {
-          // Log error but don't fail - order is already created on-chain
-          console.error('Warning: Failed to submit payment info to backend:', backendErr);
-          // The seller can retry via the update payment info feature if needed
-        }
-        
-        pendingParamsRef.current = null;
+        await submitPaymentInfo(extractedOrderId, params.accountId, params.accountName);
+        console.log('Payment info submitted successfully');
+      } catch (backendErr) {
+        // Log error but don't fail - order is already created on-chain
+        console.error('Warning: Failed to submit payment info to backend:', backendErr);
       }
       
-      setCurrentStep('success');
-      
-    } catch (err) {
-      console.error('Error extracting order ID:', err);
-      setCurrentStep('success'); // Still consider it success even if we can't extract ID
-      setOrderId(createHash ?? null); // Fallback to tx hash
+      pendingParamsRef.current = null;
+    } else {
+      console.warn('Skipping payment info submission: extractedOrderId=', extractedOrderId, 'pendingParams=', !!pendingParamsRef.current);
     }
+    
+    setCurrentStep('success');
   };
 
   return {
