@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useAccount, useSwitchChain } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
 import { motion } from 'framer-motion';
 import { 
@@ -117,7 +117,8 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const orderId = params.id as string;
   
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId: walletChainId } = useAccount();
+  const { switchChain, isPending: isSwitchingChain } = useSwitchChain();
   const { authenticated, ready } = usePrivy();
   const isFullyConnected = ready && authenticated && isConnected;
   
@@ -558,6 +559,27 @@ export default function OrderDetailPage() {
                 )}
                 
                 
+                {/* Wrong chain warning */}
+                {order.chain_id && walletChainId !== order.chain_id && (
+                  <Alert className="border-amber-200/50 dark:border-amber-700/50 bg-gradient-to-r from-amber-50/80 to-orange-50/80 dark:from-amber-950/30 dark:to-orange-950/30 rounded-xl">
+                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                    <AlertDescription className="text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                      {tOrder('wrongChain', { chain: order.chain_id === 8453 ? 'Base' : 'Ethereum' })}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => switchChain?.({ chainId: order.chain_id! })}
+                        disabled={isSwitchingChain}
+                        className="ml-2 border-amber-300 hover:bg-amber-100 dark:border-amber-600 dark:hover:bg-amber-900/30 text-xs"
+                      >
+                        {isSwitchingChain ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                        {tOrder('switchChain')}
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 {/* Withdraw Section */}
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">{tOrder('withdrawTokens')}</Label>
@@ -582,7 +604,12 @@ export default function OrderDetailPage() {
                       {tOrder('max')}
                     </Button>
                     <Button
-                      onClick={() => {
+                      onClick={async () => {
+                        // Auto-switch chain if wallet is on wrong chain
+                        if (order.chain_id && walletChainId !== order.chain_id) {
+                          switchChain?.({ chainId: order.chain_id });
+                          return;
+                        }
                         const tokenInfo = getTokenInfo(order.token);
                         executeWithdraw({
                           orderId: order.order_id,
@@ -594,13 +621,19 @@ export default function OrderDetailPage() {
                       }}
                       disabled={
                         isWithdrawing ||
+                        isSwitchingChain ||
                         !withdrawAmount ||
                         parseFloat(withdrawAmount) <= 0 ||
                         parseFloat(withdrawAmount) > remainingExact
                       }
                       className="h-11 px-5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl"
                     >
-                      {isWithdrawing ? (
+                      {isSwitchingChain ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {tOrder('switchingChain')}
+                        </>
+                      ) : isWithdrawing ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           {withdrawStep === 'confirming' ? tOrder('confirming') : tOrder('signing')}
@@ -663,6 +696,11 @@ export default function OrderDetailPage() {
                       </Button>
                       <Button
                         onClick={() => {
+                          // Auto-switch chain if wallet is on wrong chain
+                          if (order.chain_id && walletChainId !== order.chain_id) {
+                            switchChain?.({ chainId: order.chain_id });
+                            return;
+                          }
                           executeUpdateRate({
                             orderId: order.order_id,
                             newRate: newRate,
@@ -671,13 +709,19 @@ export default function OrderDetailPage() {
                         }}
                         disabled={
                           isUpdating ||
+                          isSwitchingChain ||
                           !newRate ||
                           parseFloat(newRate) <= 0 ||
                           parseFloat(newRate) === exchangeRate
                         }
                         className="h-11 px-5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl"
                       >
-                        {isUpdating ? (
+                        {isSwitchingChain ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            {tOrder('switchingChain')}
+                          </>
+                        ) : isUpdating ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             {rateStep === 'confirming' ? tOrder('confirming') : tOrder('signing')}

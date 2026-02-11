@@ -112,6 +112,9 @@
       "private": "私密",
       "privateCode": "私密口令",
       "privateCodeNote": "將此口令分享給可以成交您訂單的買家。",
+      "wrongChain": "您的錢包在錯誤的網路上。此訂單在 {chain} 網路。",
+      "switchChain": "切換",
+      "switchingChain": "切換中...",
       "errors": {
         "userRejected": "交易已取消 - 您在錢包中拒絕了請求。",
         "notAuthorized": "未授權 - 您不是此訂單的所有者。",

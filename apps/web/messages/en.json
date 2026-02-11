@@ -112,6 +112,9 @@
       "private": "Private",
       "privateCode": "Private Code",
       "privateCodeNote": "Share this code with buyers who should be able to fill your order.",
+      "wrongChain": "Your wallet is on the wrong network. This order is on {chain}.",
+      "switchChain": "Switch",
+      "switchingChain": "Switching...",
       "errors": {
         "userRejected": "Transaction cancelled - you rejected the request in your wallet.",
         "notAuthorized": "Not authorized - you are not the owner of this order.",
