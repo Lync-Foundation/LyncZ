@@ -589,6 +589,7 @@ export default function OrderDetailPage() {
                           amount: withdrawAmount,
                           tokenAddress: order.token,
                           tokenDecimals: tokenInfo.decimals,
+                          chainId: order.chain_id,
                         });
                       }}
                       disabled={
@@ -665,6 +666,7 @@ export default function OrderDetailPage() {
                           executeUpdateRate({
                             orderId: order.order_id,
                             newRate: newRate,
+                            chainId: order.chain_id,
                           });
                         }}
                         disabled={
