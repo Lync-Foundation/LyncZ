@@ -483,6 +483,7 @@ fn format_cny(cents: &str) -> String {
 pub struct PaymentInfoRequest {
     pub account_id: String,
     pub account_name: String,
+    pub chain_id: Option<u64>,  // Required for blockchain hash verification when order not yet in DB
 }
 
 /// Response for payment info submission
@@ -529,21 +530,29 @@ pub async fn submit_payment_info(
         computed_hash_hex
     );
     
-    // Try to fetch order to get its chain_id for blockchain verification
-    // NOTE: Order may not exist yet in DB if payment-info arrives before event listener syncs it
+    // Try to fetch order from DB (may not exist yet if payment-info arrives before event listener)
     let order = state.db.get_order(&order_id).await.ok();
     
+    // Check if payment info already exists (updates not allowed)
     if let Some(ref order) = order {
-        // Check if payment info already exists (updates not allowed - user must create new order)
         if !order.alipay_id.is_empty() && !order.alipay_name.is_empty() {
             tracing::warn!("❌ Payment info update rejected for order {} - updates not allowed", order_id);
             return Err(ApiError::BadRequest(
                 "Payment info already set. Updates are not allowed. Please create a new order if you need different payment details.".to_string()
             ));
         }
-        
-        // Verify against blockchain with retry (handles RPC node sync delays)
-        if let Some(blockchain_client) = state.get_blockchain_client(order.chain_id as u64) {
+    }
+    
+    // Determine chain_id: from DB order if available, otherwise from request body
+    let chain_id = order.as_ref()
+        .map(|o| o.chain_id as u64)
+        .or(req.chain_id);
+    
+    // CRITICAL: Always verify submitted payment info against on-chain accountLinesHash.
+    // This ensures the plain text matches what the seller committed on-chain.
+    // Without this check, anyone could submit fake payment info for any order.
+    if let Some(chain_id) = chain_id {
+        if let Some(blockchain_client) = state.get_blockchain_client(chain_id) {
             const MAX_RETRIES: u32 = 3;
             const RETRY_DELAY_SECS: u64 = 3;
             
@@ -556,7 +565,7 @@ pub async fn submit_payment_info(
                         last_on_chain_hash_hex = format!("0x{}", hex::encode(on_chain_hash));
                         
                         if on_chain_hash == computed_hash {
-                            tracing::info!("✅ Hash verified for order {} (attempt {})", order_id, attempt);
+                            tracing::info!("✅ Hash verified on-chain for order {} (attempt {})", order_id, attempt);
                             verified = true;
                             break;
                         } else if attempt < MAX_RETRIES {
@@ -568,31 +577,35 @@ pub async fn submit_payment_info(
                         }
                     }
                     Err(e) => {
-                        tracing::warn!("⚠️ Could not verify on-chain hash for order {} (attempt {}): {}", 
+                        tracing::warn!("⚠️ Could not query on-chain hash for order {} (attempt {}): {}", 
                             order_id, attempt, e);
-                        verified = true; // Allow storing if we can't verify
-                        break;
+                        if attempt < MAX_RETRIES {
+                            tokio::time::sleep(tokio::time::Duration::from_secs(RETRY_DELAY_SECS)).await;
+                        }
                     }
                 }
             }
             
             if !verified {
                 tracing::warn!(
-                    "❌ Hash mismatch for order {} after {} retries:\n  computed: {}\n  on-chain: {}",
+                    "❌ Hash verification failed for order {} after {} retries:\n  computed: {}\n  on-chain: {}",
                     order_id, MAX_RETRIES, computed_hash_hex, last_on_chain_hash_hex
                 );
                 return Err(ApiError::BadRequest(format!(
-                    "Hash mismatch: computed {} != on-chain {}. Please verify your account details.",
+                    "Hash mismatch: computed {} != on-chain {}. The submitted account info does not match what was committed on-chain.",
                     computed_hash_hex, last_on_chain_hash_hex
                 )));
             }
         } else {
-            tracing::warn!("⚠️ Blockchain client not configured for chain {}, skipping hash verification", order.chain_id);
+            tracing::warn!("⚠️ No blockchain client for chain {}, rejecting unverified payment info", chain_id);
+            return Err(ApiError::BadRequest(format!("Cannot verify: no blockchain client for chain {}", chain_id)));
         }
     } else {
-        // Order not yet in DB (race condition - payment info arrived before event listener)
-        // Skip verification — the event listener UPSERT will preserve this payment info
-        tracing::info!("⏳ Order {} not yet in DB, storing payment info ahead of event sync", order_id);
+        // No chain_id from DB or request — cannot verify. Reject.
+        tracing::warn!("❌ Cannot verify payment info for order {} — no chain_id available", order_id);
+        return Err(ApiError::BadRequest(
+            "chain_id is required when order is not yet synced. Please include chain_id in the request.".to_string()
+        ));
     }
     
     // Store plain text in database (initial submission only)

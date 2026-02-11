@@ -97,7 +97,7 @@ export const api = {
    * On-chain only stores accountLinesHash for privacy. Plain text is stored
    * in the backend database for buyer display.
    */
-  async submitPaymentInfo(orderId: string, accountId: string, accountName: string): Promise<{
+  async submitPaymentInfo(orderId: string, accountId: string, accountName: string, chainId?: number): Promise<{
     success: boolean;
     message: string;
     computed_hash: string;
@@ -105,6 +105,7 @@ export const api = {
     const response = await axios.post(`${API_BASE}/api/orders/${orderId}/payment-info`, {
       account_id: accountId,
       account_name: accountName,
+      chain_id: chainId,  // Required for on-chain hash verification
     });
     return response.data;
   },

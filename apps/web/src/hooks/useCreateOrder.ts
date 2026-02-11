@@ -253,7 +253,7 @@ export function useCreateOrder() {
           accountName: params.accountName,
         });
         
-        await submitPaymentInfo(extractedOrderId, params.accountId, params.accountName);
+        await submitPaymentInfo(extractedOrderId, params.accountId, params.accountName, params.chainId);
         console.log('Payment info submitted successfully');
       } catch (backendErr) {
         // Log error but don't fail - order is already created on-chain
